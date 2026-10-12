@@ -1,0 +1,27 @@
+# Xcode
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.build/
+.swiftpm/
+Packages/*/.build/
+Package.resolved
+
+# macOS
+.DS_Store
+
+# Unity (Fallback/ChargeUpQuest)
+Fallback/ChargeUpQuest/[Ll]ibrary/
+Fallback/ChargeUpQuest/[Tt]emp/
+Fallback/ChargeUpQuest/[Oo]bj/
+Fallback/ChargeUpQuest/[Bb]uild/
+Fallback/ChargeUpQuest/[Ll]ogs/
+Fallback/ChargeUpQuest/[Uu]ser[Ss]ettings/
