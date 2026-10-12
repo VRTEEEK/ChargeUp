@@ -46,6 +46,12 @@
       "advance": { "kind": "nurseTap", "label": "DONE" } }
   ],
   "config": {
+    "audio": {
+      "portGainDb": 0,
+      "lanternGainDb": -6,
+      "lanternSounds": ["flow_loop"],
+      "loopingSounds": ["flow_loop"]
+    },
     "lantern": {
       "forwardM": 0.4,
       "belowHeadM": 0.3,

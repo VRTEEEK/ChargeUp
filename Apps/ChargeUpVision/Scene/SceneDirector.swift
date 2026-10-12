@@ -11,13 +11,22 @@ final class SceneDirector {
     let controller: SessionController
     let portRoot: Entity
     let lantern = ChargeObjectEntity()
+    let sounds: SoundBank
     private var lastStepId: String?
 
     init(controller: SessionController) {
         self.controller = controller
+        sounds = SoundBank(config: controller.sequence.config.audio)
         portRoot = PortEntity.make()
         portRoot.isEnabled = false
+        portRoot.addChild(sounds.portSource)
         lantern.root.isEnabled = false
+        lantern.root.addChild(sounds.lanternSource)
+    }
+
+    func loadSounds() async {
+        await sounds.load(ids: controller.sequence.audioIds)
+        controller.noteAudio(sounds.status)
     }
 
     func attach(to content: RealityViewContent) {
@@ -40,6 +49,19 @@ final class SceneDirector {
             portRoot.isEnabled = false
         }
         updateLantern()
+        stepChanged()
+    }
+
+    /// Fires once per step entry: per-step sound, loop handling.
+    private func stepChanged() {
+        let stepId = controller.currentStepId
+        guard stepId != lastStepId else { return }
+        lastStepId = stepId
+        if let step = controller.currentStep {
+            sounds.play(step.audio)
+        } else {
+            sounds.stopLoop()
+        }
     }
 
     /// Lantern state from the session. Task 5 moves this into StepVisuals.

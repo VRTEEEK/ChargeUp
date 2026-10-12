@@ -170,6 +170,20 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
 }
 
+/// Two spatial sources: per-step sounds at the port, the flow loop at the
+/// lantern. Which ids go to the lantern and which loop is data, not code.
+public struct AudioConfig: Codable, Equatable, Sendable {
+    public var portGainDb: Double
+    public var lanternGainDb: Double
+    /// Audio ids played at the lantern instead of the port.
+    public var lanternSounds: [String]
+    /// Audio ids that loop until the step changes.
+    public var loopingSounds: [String]
+
+    public func playsAtLantern(_ id: String) -> Bool { lanternSounds.contains(id) }
+    public func loops(_ id: String) -> Bool { loopingSounds.contains(id) }
+}
+
 /// Where the charge object sits. Placed once at session start from the
 /// head pose, then world-anchored so it does not follow the head.
 public struct LanternConfig: Codable, Equatable, Sendable {
@@ -194,6 +208,7 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
+    public var audio: AudioConfig
     public var lantern: LanternConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
@@ -211,6 +226,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
@@ -301,6 +317,12 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
         for required in [StepID.countdown, StepID.charge] where !seen.contains(required) {
             throw SequenceError.missingStep(required)
         }
+    }
+
+    /// Every audio id any step names, in step order, without duplicates.
+    public var audioIds: [String] {
+        var seen = Set<String>()
+        return steps.map(\.audio).filter { seen.insert($0).inserted }
     }
 
     public func index(of stepId: String) -> Int? {

@@ -17,6 +17,7 @@ struct ImmersiveView: View {
             let director = SceneDirector(controller: controller)
             director.attach(to: content)
             self.director = director
+            Task { await director.loadSounds() }
             frameSubscription = content.subscribe(to: SceneEvents.Update.self) { _ in
                 director.frame(now: CACurrentMediaTime())
             }

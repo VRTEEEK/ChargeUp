@@ -21,6 +21,15 @@ import Testing
         #expect(seq.config.headOnPortDegrees == 25)
     }
 
+    @Test func audioConfigAndIds() throws {
+        let seq = try ChargeSequence.shipped()
+        #expect(seq.audioIds == ["port_place", "frost", "pulse", "click", "flow_loop", "complete", "seal"])
+        #expect(seq.config.audio.playsAtLantern("flow_loop"))
+        #expect(!seq.config.audio.playsAtLantern("click"))
+        #expect(seq.config.audio.loops("flow_loop"))
+        #expect(seq.config.audio.lanternGainDb == -6)
+    }
+
     @Test func missingFieldFails() throws {
         var json = try shippedJSON()
         var step = (json["steps"] as! [[String: Any]])[0]

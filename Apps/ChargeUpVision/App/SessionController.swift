@@ -22,6 +22,7 @@ final class SessionController: ObservableObject {
     @Published private(set) var forearmStatus = "idle"
     /// "head pose" once the lantern was placed from world tracking, "fallback" otherwise.
     @Published private(set) var lanternPlacement = "not placed"
+    @Published private(set) var audioStatus = "not loaded"
     private var bag = Set<AnyCancellable>()
 
     init() {
@@ -65,6 +66,8 @@ final class SessionController: ObservableObject {
     }
 
     func reset() { host.reset() }
+
+    func noteAudio(_ status: String) { audioStatus = status }
 
     func noteLanternPlacement(fromHeadPose: Bool, head: SIMD3<Float>?, lantern: SIMD3<Float>) {
         let h = head.map { String(format: "head (%.2f, %.2f, %.2f) ", $0.x, $0.y, $0.z) } ?? ""
