@@ -46,6 +46,14 @@
       "advance": { "kind": "nurseTap", "label": "DONE" } }
   ],
   "config": {
+    "lantern": {
+      "forwardM": 0.4,
+      "belowHeadM": 0.3,
+      "fallbackHeadHeightM": 1.6,
+      "headPoseWaitMs": 1500,
+      "simulatedForwardM": 0.7,
+      "simulatedBelowHeadM": 0.12
+    },
     "stillnessThresholdMps": 0.05,
     "stillnessWindowMs": 300,
     "headOnPortDegrees": 25,
@@ -67,7 +75,7 @@
       "filterMaxStepMs": 100,
       "simulatedForearm": true,
       "simulatedPath": {
-        "center": [0.12, 1.45, -0.6],
+        "center": [-0.22, 1.42, -0.62],
         "radiusMm": 40,
         "periodS": 8,
         "normal": [0.0, 0.6, 0.8]

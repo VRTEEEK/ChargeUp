@@ -170,8 +170,31 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
 }
 
+/// Where the charge object sits. Placed once at session start from the
+/// head pose, then world-anchored so it does not follow the head.
+public struct LanternConfig: Codable, Equatable, Sendable {
+    /// Distance in front of the head along its forward direction on the floor plane.
+    public var forwardM: Double
+    /// Drop from head height to chest height.
+    public var belowHeadM: Double
+    /// Head height to assume if no device pose arrives (simulator, desk test).
+    public var fallbackHeadHeightM: Double
+    /// How long to wait for the first device pose before using the fallback.
+    public var headPoseWaitMs: Int
+    /// Used instead of forwardM / belowHeadM while the simulated forearm is
+    /// active, so the lantern sits inside the simulator's fixed camera frame.
+    public var simulatedForwardM: Double
+    public var simulatedBelowHeadM: Double
+
+    public var forward: Float { Float(forwardM) }
+    public var belowHead: Float { Float(belowHeadM) }
+    public var fallbackHeadHeight: Float { Float(fallbackHeadHeightM) }
+    public var headPoseWait: TimeInterval { Double(headPoseWaitMs) / 1000 }
+}
+
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
+    public var lantern: LanternConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
     public var headOnPortDegrees: Double
@@ -188,6 +211,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        lantern = try c.decode(LanternConfig.self, forKey: .lantern)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
         headOnPortDegrees = try c.decode(Double.self, forKey: .headOnPortDegrees)

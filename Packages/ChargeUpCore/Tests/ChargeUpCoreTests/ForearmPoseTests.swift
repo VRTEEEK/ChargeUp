@@ -155,3 +155,30 @@ import simd
         #expect(simd_length(pLap.position - p0.position) < 1e-4)
     }
 }
+
+@Suite struct LanternPlacementTests {
+    let config = try! ChargeSequence.shipped().config.lantern
+
+    @Test func fallbackPlacesAheadOfOriginAtChestHeight() {
+        let m = LanternPlacement.transform(head: nil, config: config)
+        let p = ForearmPoseSolver.translation(of: m)
+        #expect(abs(p.x) < 1e-5)
+        #expect(abs(p.y - (config.fallbackHeadHeight - config.belowHead)) < 1e-5)
+        #expect(abs(p.z + config.forward) < 1e-5)
+    }
+
+    @Test func followsHeadYawOnlyAndFacesBack() {
+        // Head at (1, 1.5, 2), turned 90° to look along +X, pitched down 30°.
+        let yaw = simd_quatf(angle: -.pi / 2, axis: SIMD3(0, 1, 0))
+        let pitch = simd_quatf(angle: -.pi / 6, axis: SIMD3(1, 0, 0))
+        var head = simd_float4x4(yaw * pitch)
+        head.columns.3 = SIMD4(1, 1.5, 2, 1)
+        let m = LanternPlacement.transform(head: head, config: config)
+        let p = ForearmPoseSolver.translation(of: m)
+        #expect(abs(p.x - (1 + config.forward)) < 1e-4, "0.4 m along the head's +X look direction")
+        #expect(abs(p.y - (1.5 - config.belowHead)) < 1e-4, "pitch ignored")
+        #expect(abs(p.z - 2) < 1e-4)
+        let facing = SIMD3<Float>(m.columns.2.x, m.columns.2.y, m.columns.2.z)
+        #expect(simd_length(facing - SIMD3(-1, 0, 0)) < 1e-4, "+Z points back at the head")
+    }
+}

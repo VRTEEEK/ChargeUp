@@ -14,10 +14,14 @@ final class SessionController: ObservableObject {
     /// tracking is unsupported and the config flag allows it.
     let portSource: any PortPoseSource
     let isSimulatedForearm: Bool
+    let headPose = HeadPose()
+    private let debugControl: DebugFileControl
 
     @Published private(set) var isRunning = false
     /// Mirrors `portSource.statusText`; updated from the frame loop only when it changes.
     @Published private(set) var forearmStatus = "idle"
+    /// "head pose" once the lantern was placed from world tracking, "fallback" otherwise.
+    @Published private(set) var lanternPlacement = "not placed"
     private var bag = Set<AnyCancellable>()
 
     init() {
@@ -27,6 +31,7 @@ final class SessionController: ObservableObject {
             fatalError("sequence.json failed to load: \(error)")
         }
         host = SessionHost(sequence: sequence)
+        debugControl = DebugFileControl(host: host)
         let forearm = sequence.config.forearm
         if forearm.simulatedForearm && !HandTrackingProvider.isSupported {
             portSource = SimulatedForearm(config: forearm.simulatedPath)
@@ -49,15 +54,22 @@ final class SessionController: ObservableObject {
         guard !isRunning else { return }
         isRunning = true
         host.start()
+        debugControl.start()
     }
 
     func stop() {
         guard isRunning else { return }
         isRunning = false
+        debugControl.stop()
         host.stop()
     }
 
     func reset() { host.reset() }
+
+    func noteLanternPlacement(fromHeadPose: Bool, head: SIMD3<Float>?, lantern: SIMD3<Float>) {
+        let h = head.map { String(format: "head (%.2f, %.2f, %.2f) ", $0.x, $0.y, $0.z) } ?? ""
+        lanternPlacement = (fromHeadPose ? "head pose " : "fallback ") + h + String(format: "lantern (%.2f, %.2f, %.2f)", lantern.x, lantern.y, lantern.z)
+    }
 
     /// Called every rendered frame by the scene.
     func frame(now: TimeInterval) -> PortPose? {

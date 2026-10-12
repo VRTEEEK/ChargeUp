@@ -80,6 +80,7 @@ struct OperatorWindow: View {
                     Text(controller.forearmStatus)
                 }
             }
+            LabeledContent("Lantern", value: controller.lanternPlacement)
             LabeledContent("Link", value: controller.host.channel.lastDiagnostic)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

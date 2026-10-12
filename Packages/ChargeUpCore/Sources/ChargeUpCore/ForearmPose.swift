@@ -230,3 +230,38 @@ public enum SimulatedForearmPath {
         return PortPose(position: position, orientation: simd_quatf(rotation), opacity: 1, status: .tracked)
     }
 }
+
+/// Where to put the lantern, from the head pose at session start.
+public enum LanternPlacement {
+    /// `head` is the device transform (origin from device), or nil to use the fallback height
+    /// facing -Z from the space origin. The lantern is dropped to chest height and
+    /// turned to face the head, yaw only.
+    public static func transform(head: simd_float4x4?, config: LanternConfig, simulated: Bool = false) -> simd_float4x4 {
+        let forwardDistance = Float(simulated ? config.simulatedForwardM : config.forwardM)
+        let drop = Float(simulated ? config.simulatedBelowHeadM : config.belowHeadM)
+        let headPos: SIMD3<Float>
+        var forward: SIMD3<Float>
+        if let head {
+            headPos = ForearmPoseSolver.translation(of: head)
+            // The device looks down its local -Z.
+            let f = head.columns.2
+            forward = SIMD3<Float>(-f.x, 0, -f.z)
+            if simd_length(forward) < 1e-4 { forward = SIMD3<Float>(0, 0, -1) }
+        } else {
+            headPos = SIMD3<Float>(0, config.fallbackHeadHeight, 0)
+            forward = SIMD3<Float>(0, 0, -1)
+        }
+        forward = simd_normalize(forward)
+        let position = SIMD3<Float>(headPos.x, headPos.y - drop, headPos.z) + forward * forwardDistance
+        // Lantern +Z faces back toward the head.
+        let z = -forward
+        let y = SIMD3<Float>(0, 1, 0)
+        let x = simd_normalize(simd_cross(y, z))
+        var m = matrix_identity_float4x4
+        m.columns.0 = SIMD4(x, 0)
+        m.columns.1 = SIMD4(y, 0)
+        m.columns.2 = SIMD4(z, 0)
+        m.columns.3 = SIMD4(position, 1)
+        return m
+    }
+}
