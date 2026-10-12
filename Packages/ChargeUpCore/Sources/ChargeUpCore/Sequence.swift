@@ -122,6 +122,20 @@ public struct SignedAxis: Codable, Equatable, Sendable {
     }
 }
 
+/// A slow closed path the port follows when there is no hand tracking (the
+/// simulator, or a desk test). Metres from the space origin at the floor.
+public struct SimulatedPathConfig: Codable, Equatable, Sendable {
+    public var center: [Double]
+    public var radiusMm: Double
+    public var periodS: Double
+    /// Skin normal of the fake forearm, so the port faces somewhere sensible.
+    public var normal: [Double]
+
+    public var centre: SIMD3<Float> { SIMD3(Float(center[0]), Float(center[1]), Float(center[2])) }
+    public var radius: Float { Float(radiusMm / 1000) }
+    public var normalVector: SIMD3<Float> { SIMD3(Float(normal[0]), Float(normal[1]), Float(normal[2])) }
+}
+
 /// Everything the forearm anchor needs. Lives in config so the dorsal axis,
 /// offsets and smoothing can be tuned on the arm without a code change.
 public struct ForearmConfig: Codable, Equatable, Sendable {
@@ -144,6 +158,10 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     /// The filter never integrates a gap longer than this, so a re-acquired
     /// pose eases in over a few frames instead of snapping.
     public var filterMaxStepMs: Int
+    /// When hand tracking is unsupported on this device, drive the port along
+    /// `simulatedPath` and report the child as still and looking at the port.
+    public var simulatedForearm: Bool
+    public var simulatedPath: SimulatedPathConfig
 
     public var portOffsetProximal: Float { Float(portOffsetProximalMm / 1000) }
     public var forearmRadius: Float { Float(forearmRadiusMm / 1000) }
@@ -190,7 +208,8 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         }
         guard forearm.holdLastPoseMs >= 0, forearm.fadeMs > 0, forearm.filterMaxStepMs > 0,
               (0...1).contains(forearm.occludedOpacity), forearm.filterMinCutoffHz > 0,
-              forearm.filterDerivativeCutoffHz > 0 else {
+              forearm.filterDerivativeCutoffHz > 0, forearm.simulatedPath.center.count == 3,
+              forearm.simulatedPath.normal.count == 3, forearm.simulatedPath.periodS > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .forearm, in: c, debugDescription: "forearm config values out of range")
         }

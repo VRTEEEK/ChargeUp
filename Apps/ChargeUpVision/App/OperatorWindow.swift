@@ -11,6 +11,10 @@ struct OperatorWindow: View {
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @State private var spaceOpen = false
 
+    /// Debug only, default off: `CHARGEUP_AUTOSTART=1` in the environment
+    /// presses Start on launch so the simulator can be driven without a click.
+    private static let autostart = ProcessInfo.processInfo.environment["CHARGEUP_AUTOSTART"] == "1"
+
     var body: some View {
         VStack(spacing: 20) {
             Text("Charge Up")
@@ -18,17 +22,7 @@ struct OperatorWindow: View {
 
             if !spaceOpen {
                 Button {
-                    Task {
-                        switch await openImmersiveSpace(id: ImmersiveView.id) {
-                        case .opened:
-                            spaceOpen = true
-                            controller.start()
-                        case .userCancelled, .error:
-                            break
-                        @unknown default:
-                            break
-                        }
-                    }
+                    Task { await openSpace() }
                 } label: {
                     Text("Start")
                         .font(.title.bold())
@@ -51,6 +45,21 @@ struct OperatorWindow: View {
             }
         }
         .padding(28)
+        .task {
+            if OperatorWindow.autostart, !spaceOpen { await openSpace() }
+        }
+    }
+
+    private func openSpace() async {
+        switch await openImmersiveSpace(id: ImmersiveView.id) {
+        case .opened:
+            spaceOpen = true
+            controller.start()
+        case .userCancelled, .error:
+            break
+        @unknown default:
+            break
+        }
     }
 
     private var status: some View {
@@ -68,10 +77,7 @@ struct OperatorWindow: View {
                     Circle()
                         .fill(forearmColor)
                         .frame(width: 10, height: 10)
-                    Text(controller.forearm.status.rawValue)
-                    if !controller.forearm.lastError.isEmpty {
-                        Text(controller.forearm.lastError).foregroundStyle(.secondary)
-                    }
+                    Text(controller.forearmStatus)
                 }
             }
             LabeledContent("Link", value: controller.host.channel.lastDiagnostic)
@@ -82,12 +88,11 @@ struct OperatorWindow: View {
     }
 
     private var forearmColor: Color {
-        switch controller.forearm.status {
-        case .tracked: return .green
-        case .holding: return .yellow
-        case .faded, .searching: return .orange
-        case .idle: return .gray
-        case .unsupported, .unauthorized, .failed: return .red
-        }
+        let s = controller.forearmStatus
+        if s.hasPrefix("tracked") || s == "simulated" { return .green }
+        if s.hasPrefix("holding") { return .yellow }
+        if s.hasPrefix("faded") || s.hasPrefix("searching") { return .orange }
+        if s.hasPrefix("idle") || s.hasPrefix("simulated") { return .gray }
+        return .red
     }
 }

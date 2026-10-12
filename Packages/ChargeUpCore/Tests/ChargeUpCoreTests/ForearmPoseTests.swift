@@ -130,3 +130,28 @@ import simd
         #expect(t.pose(at: 1) == nil)
     }
 }
+
+@Suite struct SimulatedForearmTests {
+    let config = try! ChargeSequence.shipped().config.forearm
+
+    @Test func flagIsOnInShippedConfig() {
+        #expect(config.simulatedForearm)
+        #expect(config.simulatedPath.periodS == 8)
+    }
+
+    @Test func pathIsACircleAboutTheCentreFacingTheNormal() {
+        let c = config.simulatedPath
+        let p0 = SimulatedForearmPath.pose(at: 0, config: c)
+        #expect(abs(simd_length(p0.position - c.centre) - c.radius) < 1e-5)
+        #expect(p0.status == .tracked)
+        #expect(p0.opacity == 1)
+        let normal = p0.orientation.act(SIMD3<Float>(0, 1, 0))
+        #expect(simd_length(normal - simd_normalize(c.normalVector)) < 1e-4)
+        // Half a lap later the port is on the far side of the circle.
+        let pHalf = SimulatedForearmPath.pose(at: c.periodS / 2, config: c)
+        #expect(abs(simd_length(pHalf.position - p0.position) - 2 * c.radius) < 1e-4)
+        // A whole lap returns to the start.
+        let pLap = SimulatedForearmPath.pose(at: c.periodS, config: c)
+        #expect(simd_length(pLap.position - p0.position) < 1e-4)
+    }
+}

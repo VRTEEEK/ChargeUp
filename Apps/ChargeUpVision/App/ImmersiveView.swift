@@ -1,5 +1,6 @@
 import SwiftUI
 import RealityKit
+import QuartzCore
 import ChargeUpCore
 
 /// The child's view. No UI lives here; the operator window carries all
@@ -16,7 +17,7 @@ struct ImmersiveView: View {
             port.isEnabled = false
             content.add(port)
             frameSubscription = content.subscribe(to: SceneEvents.Update.self) { _ in
-                guard let pose = controller.forearm.pose() else {
+                guard let pose = controller.frame(now: CACurrentMediaTime()) else {
                     port.isEnabled = false
                     return
                 }
@@ -25,10 +26,10 @@ struct ImmersiveView: View {
             }
         }
         .task {
-            await controller.forearm.start()
+            await controller.portSource.start()
         }
         .onDisappear {
-            controller.forearm.stop()
+            controller.portSource.stop()
             frameSubscription = nil
         }
     }

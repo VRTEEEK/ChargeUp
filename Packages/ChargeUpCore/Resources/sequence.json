@@ -64,7 +64,14 @@
       "filterMinCutoffHz": 1.0,
       "filterBeta": 2.0,
       "filterDerivativeCutoffHz": 1.0,
-      "filterMaxStepMs": 100
+      "filterMaxStepMs": 100,
+      "simulatedForearm": true,
+      "simulatedPath": {
+        "center": [0.12, 1.45, -0.6],
+        "radiusMm": 40,
+        "periodS": 8,
+        "normal": [0.0, 0.6, 0.8]
+      }
     }
   }
 }

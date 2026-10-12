@@ -212,3 +212,21 @@ public struct ForearmTracker: Sendable {
         return current < target ? min(target, current + delta) : max(target, current - delta)
     }
 }
+
+/// Port pose on the simulated forearm: a horizontal circle of `radius` about
+/// `centre`, one lap per `periodS`, with the port facing `normal`.
+public enum SimulatedForearmPath {
+    public static func pose(at t: TimeInterval, config: SimulatedPathConfig) -> PortPose {
+        let phase = Float(2 * Double.pi * (t / config.periodS).truncatingRemainder(dividingBy: 1))
+        let offset = SIMD3<Float>(cos(phase), 0, sin(phase)) * config.radius
+        let position = config.centre + offset
+        let y = simd_normalize(config.normalVector)
+        // +X of the port frame points toward the (imaginary) hand: along the world -X here.
+        var x = SIMD3<Float>(-1, 0, 0)
+        x -= y * simd_dot(x, y)
+        x = simd_normalize(x)
+        let z = simd_normalize(simd_cross(x, y))
+        let rotation = simd_float3x3(columns: (x, y, z))
+        return PortPose(position: position, orientation: simd_quatf(rotation), opacity: 1, status: .tracked)
+    }
+}
