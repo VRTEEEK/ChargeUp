@@ -3,9 +3,17 @@ import ChargeUpCore
 
 @main
 struct ChargeUpVisionApp: App {
+    @StateObject private var controller = SessionController()
+
     var body: some Scene {
-        WindowGroup {
-            Text("Charge Up")
+        WindowGroup(id: OperatorWindow.id) {
+            OperatorWindow(controller: controller)
         }
+        .defaultSize(width: 520, height: 420)
+
+        ImmersiveSpace(id: ImmersiveView.id) {
+            ImmersiveView(controller: controller)
+        }
+        .immersionStyle(selection: .constant(.mixed), in: .mixed)
     }
 }
