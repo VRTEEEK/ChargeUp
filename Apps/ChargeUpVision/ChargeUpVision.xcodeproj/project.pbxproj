@@ -1,0 +1,411 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		E07B1BBC69D2DE0509E22892 /* ChargeUpCore in Frameworks */ = {isa = PBXBuildFile; productRef = E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		E8DC5D8EFCDF695A5FBFB2BF /* ChargeUpVision.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ChargeUpVision.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		10D770B21AA0920F6EF018F0 /* Exceptions for "App" folder in "ChargeUpVision" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				.gitkeep,
+			);
+			target = 53D75F55C4D23E3A0DE7133E /* ChargeUpVision */;
+		};
+		0DEC2B6E82D6AFE7DB3BDDCA /* Exceptions for "Tracking" folder in "ChargeUpVision" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				.gitkeep,
+			);
+			target = 53D75F55C4D23E3A0DE7133E /* ChargeUpVision */;
+		};
+		F03BAB88D11B80430B5852FB /* Exceptions for "Scene" folder in "ChargeUpVision" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				.gitkeep,
+			);
+			target = 53D75F55C4D23E3A0DE7133E /* ChargeUpVision */;
+		};
+		4B2EF40196A7FAA096836A0B /* Exceptions for "Audio" folder in "ChargeUpVision" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				.gitkeep,
+			);
+			target = 53D75F55C4D23E3A0DE7133E /* ChargeUpVision */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		101F8676974D852F7948D37F /* App */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				10D770B21AA0920F6EF018F0 /* Exceptions for "App" folder in "ChargeUpVision" target */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F20B52130C09C354BBD36195 /* Tracking */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				0DEC2B6E82D6AFE7DB3BDDCA /* Exceptions for "Tracking" folder in "ChargeUpVision" target */,
+			);
+			path = Tracking;
+			sourceTree = "<group>";
+		};
+		573E3058AC642EEFE836F90E /* Scene */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F03BAB88D11B80430B5852FB /* Exceptions for "Scene" folder in "ChargeUpVision" target */,
+			);
+			path = Scene;
+			sourceTree = "<group>";
+		};
+		99B1229D2A54E9FB79721F15 /* Audio */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				4B2EF40196A7FAA096836A0B /* Exceptions for "Audio" folder in "ChargeUpVision" target */,
+			);
+			path = Audio;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		089242A74466AD700B78EE5A /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E07B1BBC69D2DE0509E22892 /* ChargeUpCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		68CECFF4179871DF67CFFD64 = {
+			isa = PBXGroup;
+			children = (
+				101F8676974D852F7948D37F /* App */,
+				F20B52130C09C354BBD36195 /* Tracking */,
+				573E3058AC642EEFE836F90E /* Scene */,
+				99B1229D2A54E9FB79721F15 /* Audio */,
+				3E1A4A483A41A77D5686B3E2 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		3E1A4A483A41A77D5686B3E2 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				E8DC5D8EFCDF695A5FBFB2BF /* ChargeUpVision.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		53D75F55C4D23E3A0DE7133E /* ChargeUpVision */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3512223721707CB75E304119 /* Build configuration list for PBXNativeTarget "ChargeUpVision" */;
+			buildPhases = (
+				B969FEC0CC66EE2FB0319E54 /* Sources */,
+				089242A74466AD700B78EE5A /* Frameworks */,
+				51157C3B54A6DE3228DF025E /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				101F8676974D852F7948D37F /* App */,
+				F20B52130C09C354BBD36195 /* Tracking */,
+				573E3058AC642EEFE836F90E /* Scene */,
+				99B1229D2A54E9FB79721F15 /* Audio */,
+			);
+			name = ChargeUpVision;
+			packageProductDependencies = (
+				E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */,
+			);
+			productName = ChargeUpVision;
+			productReference = E8DC5D8EFCDF695A5FBFB2BF /* ChargeUpVision.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		0F98D6CF6ECDFA8F744A3E42 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 2600;
+				LastUpgradeCheck = 2600;
+				TargetAttributes = {
+					53D75F55C4D23E3A0DE7133E = {
+						CreatedOnToolsVersion = 26.0;
+					};
+				};
+			};
+			buildConfigurationList = 0CF70C6881BD41BA024F9901 /* Build configuration list for PBXProject "ChargeUpVision" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 68CECFF4179871DF67CFFD64;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				32F373F04F4C6D4768177564 /* XCLocalSwiftPackageReference "../../Packages/ChargeUpCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 3E1A4A483A41A77D5686B3E2 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				53D75F55C4D23E3A0DE7133E /* ChargeUpVision */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		51157C3B54A6DE3228DF025E /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B969FEC0CC66EE2FB0319E54 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		E17A3CA90BB77A2B897872C9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				ONLY_ACTIVE_ARCH = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		053E83F589EFA195D854A21B /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MTL_FAST_MATH = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		6F86BDA24052BB615F9F6179 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				SDKROOT = xros;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vrteek.chargeup.vision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		FB88C62FE9DEEA108C42392A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				SDKROOT = xros;
+				SUPPORTED_PLATFORMS = "xros xrsimulator";
+				TARGETED_DEVICE_FAMILY = 7;
+				XROS_DEPLOYMENT_TARGET = 2.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 0.1;
+				PRODUCT_BUNDLE_IDENTIFIER = com.vrteek.chargeup.vision;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		0CF70C6881BD41BA024F9901 /* Build configuration list for PBXProject "ChargeUpVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E17A3CA90BB77A2B897872C9 /* Debug */,
+				053E83F589EFA195D854A21B /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		3512223721707CB75E304119 /* Build configuration list for PBXNativeTarget "ChargeUpVision" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6F86BDA24052BB615F9F6179 /* Debug */,
+				FB88C62FE9DEEA108C42392A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		32F373F04F4C6D4768177564 /* XCLocalSwiftPackageReference "../../Packages/ChargeUpCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../../Packages/ChargeUpCore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChargeUpCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 0F98D6CF6ECDFA8F744A3E42 /* Project object */;
+}
