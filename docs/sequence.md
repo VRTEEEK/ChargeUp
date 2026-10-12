@@ -23,6 +23,15 @@ Derived from `Packages/ChargeUpCore/Resources/sequence.json`. That file is the s
 | `rampIntensity` | [0.2, 1.0] | Haptic role: start and end intensity of the continuous event |
 | `rampSharpness` | 0.3 | Haptic role: sharpness of the continuous event |
 | `rampDurationMs` | 4000 | Haptic role: time to go from start to end intensity (added in M1; the ramp then holds until NEEDLE OUT) |
+| `forearm.heldArm` | left | Vision, ForearmAnchor: which hand anchor to follow |
+| `forearm.portOffsetProximalMm` | 60 | ForearmPoseSolver: wrist joint to port, toward the elbow |
+| `forearm.forearmRadiusMm` | 25 | ForearmPoseSolver: bone line to skin |
+| `forearm.dorsalAxis` | +y | ForearmPoseSolver: wrist joint axis that points out of the back of the arm (verify on device) |
+| `forearm.holdLastPoseMs` | 2000 | ForearmTracker: hold the last pose this long after tracking drops |
+| `forearm.occludedOpacity` | 0.5 | ForearmTracker: opacity after the hold expires |
+| `forearm.fadeMs` | 300 | ForearmTracker: fade duration |
+| `forearm.filterMinCutoffHz`, `filterBeta`, `filterDerivativeCutoffHz` | 1.0, 2.0, 1.0 | One-euro filter |
+| `forearm.filterMaxStepMs` | 100 | Longest gap the filter integrates; re-acquired poses ease in over a few frames |
 
 ## Who owns what
 

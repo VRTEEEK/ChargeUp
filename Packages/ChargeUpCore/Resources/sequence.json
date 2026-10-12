@@ -52,6 +52,19 @@
     "chargeRatePerSecond": 0.25,
     "rampIntensity": [0.2, 1.0],
     "rampSharpness": 0.3,
-    "rampDurationMs": 4000
+    "rampDurationMs": 4000,
+    "forearm": {
+      "heldArm": "left",
+      "portOffsetProximalMm": 60,
+      "forearmRadiusMm": 25,
+      "dorsalAxis": "+y",
+      "holdLastPoseMs": 2000,
+      "occludedOpacity": 0.5,
+      "fadeMs": 300,
+      "filterMinCutoffHz": 1.0,
+      "filterBeta": 2.0,
+      "filterDerivativeCutoffHz": 1.0,
+      "filterMaxStepMs": 100
+    }
   }
 }

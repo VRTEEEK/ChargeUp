@@ -8,6 +8,7 @@ import ChargeUpCore
 final class SessionController: ObservableObject {
     let sequence: ChargeSequence
     let host: SessionHost
+    let forearm: ForearmAnchor
 
     @Published private(set) var isRunning = false
     private var bag = Set<AnyCancellable>()
@@ -19,6 +20,8 @@ final class SessionController: ObservableObject {
             fatalError("sequence.json failed to load: \(error)")
         }
         host = SessionHost(sequence: sequence)
+        forearm = ForearmAnchor(config: sequence.config.forearm)
+        forearm.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         host.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         host.channel.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
     }

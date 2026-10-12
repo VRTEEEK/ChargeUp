@@ -63,10 +63,31 @@ struct OperatorWindow: View {
                     Text(controller.peers.map { $0.role?.rawValue ?? "?" }.joined(separator: ", "))
                 }
             }
+            LabeledContent("Forearm") {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(forearmColor)
+                        .frame(width: 10, height: 10)
+                    Text(controller.forearm.status.rawValue)
+                    if !controller.forearm.lastError.isEmpty {
+                        Text(controller.forearm.lastError).foregroundStyle(.secondary)
+                    }
+                }
+            }
             LabeledContent("Link", value: controller.host.channel.lastDiagnostic)
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var forearmColor: Color {
+        switch controller.forearm.status {
+        case .tracked: return .green
+        case .holding: return .yellow
+        case .faded, .searching: return .orange
+        case .idle: return .gray
+        case .unsupported, .unauthorized, .failed: return .red
+        }
     }
 }

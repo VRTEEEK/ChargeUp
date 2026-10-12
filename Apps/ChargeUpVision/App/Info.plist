@@ -7,6 +7,8 @@
 		<string>_chargeup._tcp</string>
 		<string>_chargeup._udp</string>
 	</array>
+	<key>NSHandsTrackingUsageDescription</key>
+	<string>Charge Up tracks the held forearm so the charging port stays on the arm.</string>
 	<key>NSLocalNetworkUsageDescription</key>
 	<string>Charge Up links this headset to the nurse's iPad and the haptic phone over the local network.</string>
 	<key>UIApplicationSceneManifest</key>

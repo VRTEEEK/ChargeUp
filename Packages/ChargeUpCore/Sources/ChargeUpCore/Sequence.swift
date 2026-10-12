@@ -89,6 +89,69 @@ public struct Step: Codable, Equatable, Sendable, Identifiable {
     }
 }
 
+/// Which arm the nurse holds.
+public enum HeldArm: String, Codable, Equatable, Sendable {
+    case left, right
+}
+
+/// A signed local axis of a tracked joint, as written in JSON: "+y", "-z", ...
+public struct SignedAxis: Codable, Equatable, Sendable {
+    public enum Axis: Character, Sendable { case x = "x", y = "y", z = "z" }
+    public var axis: Axis
+    public var sign: Double
+
+    public init(axis: Axis, sign: Double) {
+        self.axis = axis
+        self.sign = sign
+    }
+
+    public init(from decoder: Decoder) throws {
+        let raw = try decoder.singleValueContainer().decode(String.self)
+        guard raw.count == 2, let axis = Axis(rawValue: raw.last!), "+-".contains(raw.first!) else {
+            throw DecodingError.dataCorruptedError(
+                in: try decoder.singleValueContainer(),
+                debugDescription: "axis must be one of +x -x +y -y +z -z, got '\(raw)'")
+        }
+        self.axis = axis
+        self.sign = raw.first == "-" ? -1 : 1
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.singleValueContainer()
+        try c.encode("\(sign < 0 ? "-" : "+")\(axis.rawValue)")
+    }
+}
+
+/// Everything the forearm anchor needs. Lives in config so the dorsal axis,
+/// offsets and smoothing can be tuned on the arm without a code change.
+public struct ForearmConfig: Codable, Equatable, Sendable {
+    public var heldArm: HeldArm
+    /// From the forearmWrist joint toward the elbow, along the forearm.
+    public var portOffsetProximalMm: Double
+    /// From the bone line out to the skin, along the dorsal axis.
+    public var forearmRadiusMm: Double
+    /// Which local axis of the forearmWrist joint points out of the back of the forearm.
+    public var dorsalAxis: SignedAxis
+    /// After tracking drops, keep the last pose this long before fading.
+    public var holdLastPoseMs: Int
+    /// Opacity the port fades to while tracking is lost.
+    public var occludedOpacity: Double
+    /// Length of the fade in either direction.
+    public var fadeMs: Int
+    public var filterMinCutoffHz: Double
+    public var filterBeta: Double
+    public var filterDerivativeCutoffHz: Double
+    /// The filter never integrates a gap longer than this, so a re-acquired
+    /// pose eases in over a few frames instead of snapping.
+    public var filterMaxStepMs: Int
+
+    public var portOffsetProximal: Float { Float(portOffsetProximalMm / 1000) }
+    public var forearmRadius: Float { Float(forearmRadiusMm / 1000) }
+    public var holdLastPose: TimeInterval { Double(holdLastPoseMs) / 1000 }
+    public var fade: TimeInterval { Double(fadeMs) / 1000 }
+    public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
+}
+
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
     public var stillnessThresholdMps: Double
@@ -100,6 +163,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var rampSharpness: Double
     /// How long the haptic ramp takes to go from rampIntensity[0] to rampIntensity[1].
     public var rampDurationMs: Int
+    public var forearm: ForearmConfig
 
     public var rampStartIntensity: Double { rampIntensity[0] }
     public var rampEndIntensity: Double { rampIntensity[1] }
@@ -113,6 +177,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         rampIntensity = try c.decode([Double].self, forKey: .rampIntensity)
         rampSharpness = try c.decode(Double.self, forKey: .rampSharpness)
         rampDurationMs = try c.decode(Int.self, forKey: .rampDurationMs)
+        forearm = try c.decode(ForearmConfig.self, forKey: .forearm)
         guard rampIntensity.count == 2, rampIntensity.allSatisfy({ (0...1).contains($0) }) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampIntensity, in: c,
@@ -122,6 +187,12 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c,
                 debugDescription: "rampDurationMs and chargeRatePerSecond must be > 0")
+        }
+        guard forearm.holdLastPoseMs >= 0, forearm.fadeMs > 0, forearm.filterMaxStepMs > 0,
+              (0...1).contains(forearm.occludedOpacity), forearm.filterMinCutoffHz > 0,
+              forearm.filterDerivativeCutoffHz > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .forearm, in: c, debugDescription: "forearm config values out of range")
         }
     }
 }
