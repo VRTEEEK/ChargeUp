@@ -21,6 +21,23 @@ import Testing
         #expect(seq.config.headOnPortDegrees == 25)
     }
 
+    @Test func everyStepHasAPrompt() throws {
+        let seq = try ChargeSequence.shipped()
+        for step in seq.steps { #expect(!seq.prompt(for: step.id).isEmpty, Comment(rawValue: step.id)) }
+        #expect(!seq.prompt(for: SessionMarker.idle).isEmpty)
+        #expect(!seq.prompt(for: SessionMarker.complete).isEmpty)
+        #expect(seq.prompt(for: StepID.charge) == "Keep looking at the light, it's filling up.")
+        #expect(seq.prompt(for: "nope").isEmpty)
+    }
+
+    @Test func missingPromptFails() throws {
+        var json = try shippedJSON()
+        var prompts = json["prompts"] as! [String: String]
+        prompts.removeValue(forKey: "charge")
+        json["prompts"] = prompts
+        #expect(throws: SequenceError.missingPrompt(StepID.charge)) { try load(json) }
+    }
+
     @Test func visualsConfigMatchesPerceivedText() throws {
         let v = try ChargeSequence.shipped().config.visuals
         #expect(v.countdownPulseCount == 3)

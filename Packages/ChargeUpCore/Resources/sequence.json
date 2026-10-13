@@ -45,6 +45,17 @@
       "haptic": "none", "audio": "seal",
       "advance": { "kind": "nurseTap", "label": "DONE" } }
   ],
+  "prompts": {
+    "idle": "We're getting the lantern ready.",
+    "hold": "Give the guide your arm, nice and loose.",
+    "swab": "Watch the port, it's getting cold and shiny.",
+    "countdown": "Big breath in, it's about to connect.",
+    "connect": "There's the click. Look at the port.",
+    "charge": "Keep looking at the light, it's filling up.",
+    "release": "And out. Breathe out with it.",
+    "seal": "Look at the mark, that's your charge.",
+    "complete": "All charged. You did that."
+  },
   "config": {
     "visuals": {
       "portLandingMs": 600,

@@ -308,6 +308,7 @@ public enum SequenceError: Error, Equatable, CustomStringConvertible {
     case noSteps
     case duplicateStepId(String)
     case missingStep(String)
+    case missingPrompt(String)
     case resourceMissing
 
     public var description: String {
@@ -315,6 +316,7 @@ public enum SequenceError: Error, Equatable, CustomStringConvertible {
         case .noSteps: return "sequence.json has no steps"
         case .duplicateStepId(let id): return "sequence.json has duplicate step id '\(id)'"
         case .missingStep(let id): return "sequence.json is missing required step '\(id)'"
+        case .missingPrompt(let id): return "sequence.json prompts has no line for '\(id)'"
         case .resourceMissing: return "sequence.json is not in the ChargeUpCore bundle"
         }
     }
@@ -325,7 +327,12 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
     public var version: Int
     public var object: String
     public var steps: [Step]
+    /// What the parent says, keyed by step id plus `idle` and `complete`.
+    public var prompts: [String: String]
     public var config: SequenceConfig
+
+    /// The parent's line for a step id or session marker. Empty if none.
+    public func prompt(for id: String) -> String { prompts[id] ?? "" }
 
     /// Decode and validate. Throws on any missing field, bad value, duplicate
     /// id, or a missing step that the reducer depends on.
@@ -351,6 +358,10 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
         }
         for required in [StepID.countdown, StepID.charge] where !seen.contains(required) {
             throw SequenceError.missingStep(required)
+        }
+        for id in steps.map(\.id) + [SessionMarker.idle, SessionMarker.complete]
+        where (prompts[id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
+            throw SequenceError.missingPrompt(id)
         }
     }
 
