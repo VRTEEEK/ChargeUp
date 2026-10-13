@@ -46,6 +46,17 @@
       "advance": { "kind": "nurseTap", "label": "DONE" } }
   ],
   "config": {
+    "visuals": {
+      "portLandingMs": 600,
+      "countdownPulseCount": 3,
+      "countdownPulseMs": 800,
+      "cableSnapMs": 150,
+      "cableRetractMs": 400,
+      "sealFadeMs": 800,
+      "flowPacketCount": 6,
+      "flowSpeedMps": 0.5,
+      "frostSparkleCount": 8
+    },
     "audio": {
       "portGainDb": 0,
       "lanternGainDb": -6,

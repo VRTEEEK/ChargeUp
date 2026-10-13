@@ -9,29 +9,35 @@ import ChargeUpCore
 @MainActor
 final class SceneDirector {
     let controller: SessionController
-    let portRoot: Entity
+    let rig: PortRig
     let lantern = ChargeObjectEntity()
+    let flow: EnergyFlow
     let sounds: SoundBank
+    let visuals: StepVisuals
     private var lastStepId: String?
 
     init(controller: SessionController) {
         self.controller = controller
-        sounds = SoundBank(config: controller.sequence.config.audio)
-        portRoot = PortEntity.make()
-        portRoot.isEnabled = false
-        portRoot.addChild(sounds.portSource)
+        let config = controller.sequence.config
+        sounds = SoundBank(config: config.audio)
+        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount)
+        rig.root.isEnabled = false
+        rig.root.addChild(sounds.portSource)
         lantern.root.isEnabled = false
         lantern.root.addChild(sounds.lanternSource)
+        flow = EnergyFlow(packetCount: config.visuals.flowPacketCount, speedMps: config.visuals.flowSpeedMps)
+        visuals = StepVisuals(config: config.visuals, rig: rig, lantern: lantern, flow: flow)
+    }
+
+    func attach(to content: RealityViewContent) {
+        content.add(rig.root)
+        content.add(lantern.root)
+        flow.attach(to: content)
     }
 
     func loadSounds() async {
         await sounds.load(ids: controller.sequence.audioIds)
         controller.noteAudio(sounds.status)
-    }
-
-    func attach(to content: RealityViewContent) {
-        content.add(portRoot)
-        content.add(lantern.root)
     }
 
     /// World-anchor the lantern once from the head pose (or the fallback).
@@ -42,41 +48,26 @@ final class SceneDirector {
     }
 
     func frame(now: TimeInterval) {
-        if let pose = controller.frame(now: now) {
-            portRoot.isEnabled = true
-            PortEntity.apply(pose, to: portRoot)
-        } else {
-            portRoot.isEnabled = false
-        }
-        updateLantern()
-        stepChanged()
+        let pose = controller.frame(now: now)
+        if let pose { rig.apply(pose) }
+        stepChanged(now: now)
+        let state = controller.state
+        let socket = lantern.root.convert(position: lantern.cableSocket, to: nil)
+        visuals.update(now: now, charge: Float(state.charge),
+                       isCharging: state.isCharging(in: controller.sequence),
+                       portWorld: pose?.position, socketWorld: socket)
     }
 
-    /// Fires once per step entry: per-step sound, loop handling.
-    private func stepChanged() {
+    /// Fires once per step entry: visuals and sound for the row.
+    private func stepChanged(now: TimeInterval) {
         let stepId = controller.currentStepId
         guard stepId != lastStepId else { return }
         lastStepId = stepId
+        visuals.enter(stepId, at: now)
         if let step = controller.currentStep {
             sounds.play(step.audio)
         } else {
             sounds.stopLoop()
         }
-    }
-
-    /// Lantern state from the session. Task 5 moves this into StepVisuals.
-    private func updateLantern() {
-        let state = controller.state
-        let step = controller.currentStepId
-        let target: ChargeObjectEntity.State
-        switch step {
-        case StepID.charge:
-            target = .charging(level: Float(state.charge))
-        case StepID.release, StepID.seal, SessionMarker.complete:
-            target = .lit
-        default:
-            target = .dark
-        }
-        if target != lantern.state { lantern.apply(target) }
     }
 }

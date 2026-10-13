@@ -170,6 +170,33 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
 }
 
+/// Timings and counts for the per-step visuals. Each maps to a row's
+/// "perceived" text; nothing here invents a visual.
+public struct VisualsConfig: Codable, Equatable, Sendable {
+    /// hold: the port settles onto the arm over this long.
+    public var portLandingMs: Int
+    /// countdown: this many pulses of light, this far apart.
+    public var countdownPulseCount: Int
+    public var countdownPulseMs: Int
+    /// connect: the cable reaches the port in this long.
+    public var cableSnapMs: Int
+    /// release: the cable pulls back in this long.
+    public var cableRetractMs: Int
+    /// seal: the mark fades in over this long.
+    public var sealFadeMs: Int
+    /// charge: energy packets along the cable, and their speed while flowing.
+    public var flowPacketCount: Int
+    public var flowSpeedMps: Double
+    /// swab: sparkles orbiting the port.
+    public var frostSparkleCount: Int
+
+    public var portLanding: TimeInterval { Double(portLandingMs) / 1000 }
+    public var countdownPulse: TimeInterval { Double(countdownPulseMs) / 1000 }
+    public var cableSnap: TimeInterval { Double(cableSnapMs) / 1000 }
+    public var cableRetract: TimeInterval { Double(cableRetractMs) / 1000 }
+    public var sealFade: TimeInterval { Double(sealFadeMs) / 1000 }
+}
+
 /// Two spatial sources: per-step sounds at the port, the flow loop at the
 /// lantern. Which ids go to the lantern and which loop is data, not code.
 public struct AudioConfig: Codable, Equatable, Sendable {
@@ -208,6 +235,7 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
+    public var visuals: VisualsConfig
     public var audio: AudioConfig
     public var lantern: LanternConfig
     public var stillnessThresholdMps: Double
@@ -226,6 +254,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
         audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
@@ -245,6 +274,12 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c,
                 debugDescription: "rampDurationMs and chargeRatePerSecond must be > 0")
+        }
+        guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
+              visuals.cableRetractMs > 0, visuals.sealFadeMs > 0, visuals.portLandingMs > 0,
+              visuals.flowPacketCount > 0, visuals.flowSpeedMps > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .visuals, in: c, debugDescription: "visuals config values must be > 0")
         }
         guard forearm.holdLastPoseMs >= 0, forearm.fadeMs > 0, forearm.filterMaxStepMs > 0,
               (0...1).contains(forearm.occludedOpacity), forearm.filterMinCutoffHz > 0,

@@ -21,6 +21,13 @@ import Testing
         #expect(seq.config.headOnPortDegrees == 25)
     }
 
+    @Test func visualsConfigMatchesPerceivedText() throws {
+        let v = try ChargeSequence.shipped().config.visuals
+        #expect(v.countdownPulseCount == 3)
+        #expect(v.countdownPulseMs == 800, "three pulses of light, 800 ms apart")
+        #expect(v.cableSnap < v.cableRetract)
+    }
+
     @Test func audioConfigAndIds() throws {
         let seq = try ChargeSequence.shipped()
         #expect(seq.audioIds == ["port_place", "frost", "pulse", "click", "flow_loop", "complete", "seal"])
