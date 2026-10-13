@@ -14,6 +14,8 @@ final class CompanionSession: ObservableObject {
     let rehearsal: RehearsalDriver
 
     @Published private(set) var isConnected = false
+    /// True once this device has been linked at least once; a later drop is a reconnect.
+    @Published private(set) var wasConnected = false
     private var bag = Set<AnyCancellable>()
 
     init(role: Role) {
@@ -26,6 +28,10 @@ final class CompanionSession: ObservableObject {
             .map { !$0.isEmpty }
             .removeDuplicates()
             .assign(to: &$isConnected)
+        $isConnected
+            .filter { $0 }
+            .map { _ in true }
+            .assign(to: &$wasConnected)
         // Re-publish mirror and channel changes so views observing the session update.
         mirror.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         channel.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)

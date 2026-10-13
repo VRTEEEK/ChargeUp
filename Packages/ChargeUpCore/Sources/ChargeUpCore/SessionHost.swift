@@ -14,6 +14,12 @@ public final class SessionHost: ObservableObject {
     public let sequence: ChargeSequence
     public let channel: PeerChannel
     @Published public private(set) var state = SessionState()
+    /// Companion roles that have joined this session so far.
+    @Published public private(set) var knownRoles: Set<Role> = []
+    /// Roles that joined earlier and are not connected right now. The session
+    /// holds its step while this is non-empty; a rejoining companion gets the
+    /// current step, never a reset.
+    @Published public private(set) var missingRoles: Set<Role> = []
 
     public var clock: () -> TimeInterval = { Date().timeIntervalSince1970 }
     /// Called after every reduce that changed the phase.
@@ -28,7 +34,17 @@ public final class SessionHost: ObservableObject {
         self.sequence = sequence
         self.channel = channel ?? PeerChannel(role: .vision)
         self.channel.onMessage = { [weak self] message, peer in self?.receive(message, from: peer) }
-        self.channel.onPeerJoined = { [weak self] peer in self?.sync(peer) }
+        self.channel.onPeerJoined = { [weak self] peer in
+            self?.sync(peer)
+            self?.peersChanged()
+        }
+        self.channel.onPeerLeft = { [weak self] _ in self?.peersChanged() }
+    }
+
+    private func peersChanged() {
+        let connected = Set(channel.peers.compactMap(\.role))
+        knownRoles.formUnion(connected)
+        missingRoles = knownRoles.subtracting(connected)
     }
 
     public var currentStepId: String {
@@ -58,6 +74,8 @@ public final class SessionHost: ObservableObject {
         ticker?.cancel()
         ticker = nil
         channel.stop()
+        knownRoles = []
+        missingRoles = []
     }
 
     /// Operator pressed Start.

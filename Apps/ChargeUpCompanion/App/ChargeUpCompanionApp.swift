@@ -89,12 +89,18 @@ struct ConnectionBadge: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(session.isConnected ? Color.green : Color.red)
-                .frame(width: 12, height: 12)
-            Text(session.isConnected ? "Linked to headset" : "Looking for headset")
-                .font(.footnote)
-                .foregroundStyle(.secondary)
+            if session.isConnected {
+                Circle().fill(Color.green).frame(width: 12, height: 12)
+                Text("Linked to headset")
+            } else if session.wasConnected {
+                ProgressView().controlSize(.mini)
+                Text("Reconnecting to headset, step held")
+            } else {
+                Circle().fill(Color.red).frame(width: 12, height: 12)
+                Text("Looking for headset")
+            }
         }
+        .font(.footnote)
+        .foregroundStyle(.secondary)
     }
 }

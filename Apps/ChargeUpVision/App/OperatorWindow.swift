@@ -31,6 +31,16 @@ struct OperatorWindow: View {
                 .buttonStyle(.borderedProminent)
             } else {
                 status
+                if !controller.host.missingRoles.isEmpty {
+                    HStack(spacing: 10) {
+                        ProgressView()
+                        Text("Reconnecting: \(controller.host.missingRoles.map(\.rawValue).sorted().joined(separator: ", ")). Session held at \(controller.currentStep?.name ?? controller.currentStepId).")
+                            .font(.callout)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color.orange.opacity(0.18), in: RoundedRectangle(cornerRadius: 12))
+                }
                 HStack {
                     Button("Reset session", role: .destructive) { controller.reset() }
                     Spacer()

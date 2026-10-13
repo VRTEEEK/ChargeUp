@@ -167,3 +167,61 @@ import Testing
         #expect(driver.taps == tapsAtStop, "no taps after switching off")
     }
 }
+
+@Suite(.serialized) struct ResilienceLoopbackTests {
+    @MainActor
+    private func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    @Test @MainActor func companionDropMidSessionHoldsTheStepAndRejoinGetsCurrentState() async throws {
+        try #require(ProcessInfo.processInfo.environment["CHARGEUP_SKIP_LOOPBACK"] != "1")
+        let sequence = try ChargeSequence.shipped()
+        let service = "cu-test-\(String(UInt16.random(in: 0...0xFFFF), radix: 16))"
+        let host = SessionHost(sequence: sequence,
+                               channel: PeerChannel(role: .vision, serviceType: service, displayName: "vision-rs"))
+        let nurse = SessionMirror(sequence: sequence,
+                                  channel: PeerChannel(role: .nurse, serviceType: service, displayName: "nurse-rs"))
+        defer { host.stop(); nurse.channel.stop() }
+
+        host.start()
+        nurse.channel.start()
+        try #require(await waitUntil(30) { host.channel.isConnected && nurse.channel.isConnected })
+        #expect(await waitUntil(5) { host.knownRoles == [.nurse] && host.missingRoles.isEmpty })
+
+        // Nurse takes the session to countdown.
+        for expected in [StepID.hold, StepID.swab, StepID.countdown] {
+            nurse.tapButton()
+            try #require(await waitUntil(5) { nurse.currentStepId == expected })
+        }
+
+        // The iPad app dies: channel gone, mirror object gone.
+        nurse.channel.stop()
+        #expect(await waitUntil(10) { host.missingRoles == [.nurse] }, "host notices the nurse is missing")
+        try? await Task.sleep(for: .seconds(1))
+        #expect(host.currentStepId == StepID.countdown, "the session holds its step while the nurse is away")
+        #expect(host.state.phase != .idle)
+
+        // A fresh nurse app comes back: it must learn the current step, not see a reset.
+        let nurse2 = SessionMirror(sequence: sequence,
+                                   channel: PeerChannel(role: .nurse, serviceType: service, displayName: "nurse-rs-2"))
+        defer { nurse2.channel.stop() }
+        var received: [String] = []
+        nurse2.onStepChanged = { id, _ in received.append(id) }
+        nurse2.channel.start()
+        try #require(await waitUntil(30) { nurse2.channel.isConnected })
+        #expect(await waitUntil(5) { nurse2.currentStepId == StepID.countdown }, "rejoined nurse sees countdown, got \(nurse2.currentStepId)")
+        #expect(!received.contains(SessionMarker.idle))
+        #expect(await waitUntil(5) { host.missingRoles.isEmpty })
+        #expect(nurse2.buttonLabel == "CONNECT")
+
+        // And it can carry on from there.
+        nurse2.tapButton()
+        #expect(await waitUntil(5) { nurse2.currentStepId == StepID.charge })
+    }
+}
