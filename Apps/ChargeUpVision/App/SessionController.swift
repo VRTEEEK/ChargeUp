@@ -23,6 +23,9 @@ final class SessionController: ObservableObject {
     /// "head pose" once the lantern was placed from world tracking, "fallback" otherwise.
     @Published private(set) var lanternPlacement = "not placed"
     @Published private(set) var audioStatus = "not loaded"
+    /// Last per-session CSV written to Documents, for the operator window.
+    @Published private(set) var lastRecording = "none yet"
+    private var recorder = SessionRecorder()
     private var bag = Set<AnyCancellable>()
 
     init() {
@@ -41,6 +44,8 @@ final class SessionController: ObservableObject {
             portSource = ForearmAnchor(config: forearm)
             isSimulatedForearm = false
         }
+        host.onTick = { [weak self] state, now in self?.recordTick(state, at: now) }
+        host.onPhaseChanged = { [weak self] state in self?.phaseChanged(state) }
         host.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         host.channel.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
     }
@@ -63,6 +68,42 @@ final class SessionController: ObservableObject {
         isRunning = false
         debugControl.stop()
         host.stop()
+        finishRecording()
+    }
+
+    // MARK: Recording (Milestone 3 task 3)
+
+    private var documentsDirectory: URL? {
+        FileManager.default.urls(for: .documentDirectory, in: .userDomainMask).first
+    }
+
+    private func recordTick(_ state: SessionState, at now: TimeInterval) {
+        guard state.phase != .idle else { return }
+        recorder.record(stepId: host.currentStepId, hostTimestamp: now,
+                        armStill: state.armStill, headOnPort: state.headOnPort, charge: state.charge)
+    }
+
+    /// A session is one run from the first step to complete (or a reset).
+    private func phaseChanged(_ state: SessionState) {
+        switch state.phase {
+        case .step(0):
+            if !recorder.isRecording { recorder.begin(at: host.clock()) }
+        case .complete, .idle:
+            finishRecording()
+        default:
+            break
+        }
+    }
+
+    private func finishRecording() {
+        guard recorder.isRecording, let dir = documentsDirectory else { return }
+        do {
+            if let url = try recorder.finish(into: dir) {
+                lastRecording = url.lastPathComponent
+            }
+        } catch {
+            lastRecording = "write failed: \(error.localizedDescription)"
+        }
     }
 
     func reset() { host.reset() }

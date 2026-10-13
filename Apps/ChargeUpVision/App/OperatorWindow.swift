@@ -82,6 +82,7 @@ struct OperatorWindow: View {
             }
             LabeledContent("Lantern", value: controller.lanternPlacement)
             LabeledContent("Audio", value: controller.audioStatus)
+            LabeledContent("Recording", value: controller.lastRecording)
             LabeledContent("Link", value: controller.host.channel.lastDiagnostic)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

@@ -18,6 +18,8 @@ public final class SessionHost: ObservableObject {
     public var clock: () -> TimeInterval = { Date().timeIntervalSince1970 }
     /// Called after every reduce that changed the phase.
     public var onPhaseChanged: ((SessionState) -> Void)?
+    /// Called on every host tick (10 Hz) with the state and the host clock.
+    public var onTick: ((SessionState, TimeInterval) -> Void)?
 
     private var ticker: Task<Void, Never>?
     private static let tickInterval: Duration = .milliseconds(100)
@@ -79,7 +81,9 @@ public final class SessionHost: ObservableObject {
     // MARK: Private
 
     private func tick() {
-        apply(.tick(at: clock()))
+        let now = clock()
+        apply(.tick(at: now))
+        onTick?(state, now)
         guard channel.isConnected else { return }
         channel.send(.presence(headOnPort: state.headOnPort, armStill: state.armStill, charge: state.charge))
     }
