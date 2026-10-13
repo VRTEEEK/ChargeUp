@@ -52,6 +52,18 @@ struct NurseView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Toggle(isOn: Binding(get: { session.rehearsal.isOn }, set: { session.rehearsal.set($0) })) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Rehearsal").font(.headline)
+                    Text(String(format: "Taps every %.0f s so one person can test the headset alone.",
+                                session.sequence.config.rehearsalInterval))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .tint(.orange)
+            .padding(.horizontal, 4)
+
             HStack {
                 ShareLink(item: LogExport(csv: session.channel.log.csv()),
                           preview: SharePreview("Charge Up log")) {

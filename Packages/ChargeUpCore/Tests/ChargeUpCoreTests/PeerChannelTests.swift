@@ -120,3 +120,50 @@ import Testing
         #expect(host.state.phase == .idle)
     }
 }
+
+@Suite(.serialized) struct RehearsalLoopbackTests {
+    @MainActor
+    private func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    @Test @MainActor func rehearsalRunsTheWholeSequenceAgainstTheHostAndCycles() async throws {
+        try #require(ProcessInfo.processInfo.environment["CHARGEUP_SKIP_LOOPBACK"] != "1")
+        let sequence = try ChargeSequence.shipped()
+        let service = "cu-test-\(String(UInt16.random(in: 0...0xFFFF), radix: 16))"
+        let host = SessionHost(sequence: sequence,
+                               channel: PeerChannel(role: .vision, serviceType: service, displayName: "vision-rh"))
+        let nurse = SessionMirror(sequence: sequence,
+                                  channel: PeerChannel(role: .nurse, serviceType: service, displayName: "nurse-rh"))
+        let driver = RehearsalDriver(mirror: nurse, interval: 0.15)
+        defer { driver.set(false); host.stop(); nurse.channel.stop() }
+
+        host.start()
+        nurse.channel.start()
+        try #require(await waitUntil(30) { host.channel.isConnected && nurse.channel.isConnected })
+        #expect(await waitUntil(5) { nurse.channel.peers.first?.role == .vision })
+
+        var seen: [String] = []
+        nurse.onStepChanged = { id, _ in seen.append(id) }
+        driver.set(true)
+        #expect(driver.isOn)
+
+        // Whole sequence, including the auto step, then complete, then back to idle and round again.
+        #expect(await waitUntil(10) { seen.contains(SessionMarker.complete) })
+        let expected = sequence.steps.map(\.id) + [SessionMarker.complete]
+        #expect(Array(seen.prefix(expected.count)) == expected, "\(seen)")
+        #expect(await waitUntil(5) { seen.filter { $0 == StepID.hold }.count >= 2 }, "cycles after complete: \(seen)")
+        #expect(host.state.phase != .idle || seen.last == SessionMarker.idle)
+
+        driver.set(false)
+        #expect(!driver.isOn)
+        let tapsAtStop = driver.taps
+        try? await Task.sleep(for: .milliseconds(400))
+        #expect(driver.taps == tapsAtStop, "no taps after switching off")
+    }
+}

@@ -247,7 +247,11 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var rampSharpness: Double
     /// How long the haptic ramp takes to go from rampIntensity[0] to rampIntensity[1].
     public var rampDurationMs: Int
+    /// Rehearsal mode on the nurse app taps the button this often.
+    public var rehearsalIntervalMs: Int
     public var forearm: ForearmConfig
+
+    public var rehearsalInterval: TimeInterval { Double(rehearsalIntervalMs) / 1000 }
 
     public var rampStartIntensity: Double { rampIntensity[0] }
     public var rampEndIntensity: Double { rampIntensity[1] }
@@ -264,11 +268,16 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         rampIntensity = try c.decode([Double].self, forKey: .rampIntensity)
         rampSharpness = try c.decode(Double.self, forKey: .rampSharpness)
         rampDurationMs = try c.decode(Int.self, forKey: .rampDurationMs)
+        rehearsalIntervalMs = try c.decode(Int.self, forKey: .rehearsalIntervalMs)
         forearm = try c.decode(ForearmConfig.self, forKey: .forearm)
         guard rampIntensity.count == 2, rampIntensity.allSatisfy({ (0...1).contains($0) }) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampIntensity, in: c,
                 debugDescription: "rampIntensity must be exactly two values in 0...1")
+        }
+        guard rehearsalIntervalMs > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .rehearsalIntervalMs, in: c, debugDescription: "rehearsalIntervalMs must be > 0")
         }
         guard rampDurationMs > 0, chargeRatePerSecond > 0 else {
             throw DecodingError.dataCorruptedError(

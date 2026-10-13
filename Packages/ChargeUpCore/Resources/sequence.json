@@ -89,6 +89,7 @@
     "rampIntensity": [0.2, 1.0],
     "rampSharpness": 0.3,
     "rampDurationMs": 4000,
+    "rehearsalIntervalMs": 3000,
     "forearm": {
       "heldArm": "left",
       "portOffsetProximalMm": 60,
