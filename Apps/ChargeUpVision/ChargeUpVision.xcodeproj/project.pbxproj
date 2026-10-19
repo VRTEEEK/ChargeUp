@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		E07B1BBC69D2DE0509E22892 /* ChargeUpCore in Frameworks */ = {isa = PBXBuildFile; productRef = E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */; };
+		F6179DA3B7FF17A95FA14227 /* ChargeUpAssets in Frameworks */ = {isa = PBXBuildFile; productRef = AC35892C7E835637028542D7 /* ChargeUpAssets */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -87,6 +88,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				E07B1BBC69D2DE0509E22892 /* ChargeUpCore in Frameworks */,
+				F6179DA3B7FF17A95FA14227 /* ChargeUpAssets in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -136,6 +138,7 @@
 			name = ChargeUpVision;
 			packageProductDependencies = (
 				E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */,
+				AC35892C7E835637028542D7 /* ChargeUpAssets */,
 			);
 			productName = ChargeUpVision;
 			productReference = E8DC5D8EFCDF695A5FBFB2BF /* ChargeUpVision.app */;
@@ -167,6 +170,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				32F373F04F4C6D4768177564 /* XCLocalSwiftPackageReference "../../Packages/ChargeUpCore" */,
+				85470FA23211B697F761541F /* XCLocalSwiftPackageReference "Assets/ChargeUpAssets" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 3E1A4A483A41A77D5686B3E2 /* Products */;
@@ -398,12 +402,20 @@
 			isa = XCLocalSwiftPackageReference;
 			relativePath = ../../Packages/ChargeUpCore;
 		};
+		85470FA23211B697F761541F /* XCLocalSwiftPackageReference "Assets/ChargeUpAssets" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Assets/ChargeUpAssets;
+		};
 /* End XCLocalSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
 		E88C1BAF94D6B1554F2FB54A /* ChargeUpCore */ = {
 			isa = XCSwiftPackageProductDependency;
 			productName = ChargeUpCore;
+		};
+		AC35892C7E835637028542D7 /* ChargeUpAssets */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = ChargeUpAssets;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -2,9 +2,11 @@ import RealityKit
 import UIKit
 import ChargeUpCore
 
-/// The lantern: the thing the injection charges. Three states; the charging
-/// state carries the fill level 0...1. Built from primitives so it needs no
-/// Reality Composer Pro package.
+/// The lantern: the thing the infusion charges. Three states; the charging
+/// state carries the fill level 0...1. Uses a designed model from the
+/// assets package when one is present (its `Glass` material becomes the
+/// LanternGlass shader and `fill` drives the rising light); otherwise the
+/// procedural placeholder built here from primitives.
 @MainActor
 final class ChargeObjectEntity {
     enum State: Equatable {
@@ -27,6 +29,8 @@ final class ChargeObjectEntity {
     /// Everything visible hangs off `body`, so the lantern can rise while
     /// `root` stays where the sky cluster is anchored.
     let body = Entity()
+    /// The designed model, if the slot had a file. Nil means procedural.
+    private let model: Entity?
     private let core: ModelEntity
     private let fill: ModelEntity
     private(set) var state: State = .dark
@@ -44,10 +48,13 @@ final class ChargeObjectEntity {
     /// Where the cable leaves the lantern, in the lantern's local frame.
     var cableSocket: SIMD3<Float> { body.convert(position: SIMD3(0, Self.capHeight / 2, Self.bodyRadius), to: root) }
 
-    init() {
+    /// - Parameter model: a clone from `AssetCatalog.model(.lanternHero)` or a
+    ///   variant, already carrying the Glass shader; nil for the placeholder.
+    init(model: Entity? = nil) {
         root.name = "lantern"
         body.name = "lanternBody"
         root.addChild(body)
+        self.model = model
 
         var glassMaterial = PhysicallyBasedMaterial()
         glassMaterial.baseColor = .init(tint: Self.glass)
@@ -88,11 +95,33 @@ final class ChargeObjectEntity {
         fill.isEnabled = false
         body.addChild(fill)
 
+        if let model {
+            // Designed lantern: the primitives stay built but hidden, so the
+            // placeholder is one flag away if the file is removed.
+            for child in body.children where child !== model { child.isEnabled = false }
+            body.addChild(model)
+        }
+
         apply(.dark)
+    }
+
+    /// Designed path: `fill` on the Glass shader, 0...1; glow scaled by brightness and glance.
+    private func applyToModel(fill level: Float, glow: Float) {
+        guard let model else { return }
+        AssetCatalog.setParameter(AssetCatalog.fillParameter, level, in: model)
+        AssetCatalog.setParameter(AssetCatalog.glowIntensityParameter, glow, in: model)
     }
 
     func apply(_ newState: State) {
         state = newState
+        if model != nil {
+            switch newState {
+            case .dark: applyToModel(fill: 0, glow: 0.2)
+            case .charging(let level): applyToModel(fill: max(0, min(1, level)), glow: (1.5 + 3.0 * max(0, min(1, glance))) * brightness)
+            case .lit: applyToModel(fill: 1, glow: 3.0 * brightness)
+            }
+            return
+        }
         switch newState {
         case .dark:
             core.model?.materials = [Self.glowMaterial(intensity: 0.05)]

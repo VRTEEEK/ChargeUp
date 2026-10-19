@@ -40,7 +40,9 @@ final class MarkerPortPoseSource: PortPoseSource {
             status = .unsupported
             return
         }
-        guard let image = UIImage(named: config.markerImage)?.cgImage else {
+        // Loaded by name from the assets package, so a designed emblem drops in
+        // under the same file name at the same printed size.
+        guard let image = AssetCatalog.loadImage(named: config.markerImage) else {
             status = .noMarkerImage
             return
         }

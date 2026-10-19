@@ -61,6 +61,7 @@ struct OperatorWindow: View {
     }
 
     private func openSpace() async {
+        await controller.loadAssets()
         switch await openImmersiveSpace(id: ImmersiveView.id) {
         case .opened:
             spaceOpen = true
@@ -92,6 +93,8 @@ struct OperatorWindow: View {
             }
             LabeledContent("Lantern", value: controller.lanternPlacement)
             LabeledContent("Audio", value: controller.audioStatus)
+            LabeledContent("Assets", value: controller.assetStatus)
+                .font(.footnote)
             LabeledContent("Recording", value: controller.lastRecording)
             LabeledContent("Sky") {
                 HStack {

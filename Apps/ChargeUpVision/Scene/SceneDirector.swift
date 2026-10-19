@@ -10,7 +10,7 @@ import ChargeUpCore
 final class SceneDirector {
     let controller: SessionController
     let rig: PortRig
-    let lantern = ChargeObjectEntity()
+    let lantern: ChargeObjectEntity
     let flow: EnergyFlow
     let sounds: SoundBank
     let visuals: StepVisuals
@@ -25,18 +25,20 @@ final class SceneDirector {
     init(controller: SessionController) {
         self.controller = controller
         let config = controller.sequence.config
+        let assets = controller.assets
         sounds = SoundBank(config: config.audio)
-        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount)
+        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets)
         if config.accessSite == .chestPort {
-            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize))
+            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize, assets: assets))
         }
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
+        lantern = ChargeObjectEntity(model: assets.model(.lanternHero))
         lantern.root.isEnabled = false
         lantern.root.addChild(sounds.lanternSource)
-        flow = EnergyFlow(packetCount: config.visuals.flowPacketCount, speedMps: config.visuals.flowSpeedMps)
+        flow = EnergyFlow(packetCount: config.visuals.flowPacketCount, speedMps: config.visuals.flowSpeedMps, assets: assets)
         visuals = StepVisuals(config: config.visuals, rig: rig, lantern: lantern, flow: flow)
-        sky = LanternSky(config: config.sky)
+        sky = LanternSky(config: config.sky, assets: assets)
         lantern.root.addChild(sky.root)
         sky.show(controller.skySessions)
         controller.onSkyChanged = { [weak self] sessions in self?.sky.show(sessions) }

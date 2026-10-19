@@ -15,6 +15,9 @@ final class SessionController: ObservableObject {
     let portSource: any PortPoseSource
     let isSimulatedForearm: Bool
     let headPose = HeadPose()
+    /// Designed assets from the ChargeUpAssets package; loaded before the space opens.
+    let assets = AssetCatalog()
+    @Published private(set) var assetStatus = "not loaded"
     private let debugControl: DebugFileControl
 
     @Published private(set) var isRunning = false
@@ -175,6 +178,12 @@ final class SessionController: ObservableObject {
     func reset() { host.reset() }
 
     func noteAudio(_ status: String) { audioStatus = status }
+
+    /// Called by the operator window before opening the space.
+    func loadAssets() async {
+        await assets.load()
+        assetStatus = assets.status
+    }
 
     func noteLanternPlacement(fromHeadPose: Bool, head: SIMD3<Float>?, lantern: SIMD3<Float>) {
         let h = head.map { String(format: "head (%.2f, %.2f, %.2f) ", $0.x, $0.y, $0.z) } ?? ""

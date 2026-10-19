@@ -1,0 +1,146 @@
+#usda 1.0
+(
+    customLayerData = {
+        string creator = "Charge Up, hand-authored; open in Reality Composer Pro to edit"
+    }
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    def Material "LanternGlass"
+    {
+        // 0 = dark, 1 = full. Emissive is masked against UV v so light rises from the base.
+        float inputs:fill = 0 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 60)
+                    int stackingOrderInSubgraph = 1
+                }
+            }
+        )
+        // How soft the top edge of the light is, in UV units.
+        float inputs:softness = 0.08 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 160)
+                    int stackingOrderInSubgraph = 2
+                }
+            }
+        )
+        color3f inputs:glowColor = (1, 0.78, 0.35) (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 260)
+                    int stackingOrderInSubgraph = 3
+                }
+            }
+        )
+        float inputs:glowIntensity = 3 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 360)
+                    int stackingOrderInSubgraph = 4
+                }
+            }
+        )
+        color3f inputs:glassColor = (0.85, 0.92, 1) (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 460)
+                    int stackingOrderInSubgraph = 5
+                }
+            }
+        )
+        float inputs:glassOpacity = 0.3 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 560)
+                    int stackingOrderInSubgraph = 6
+                }
+            }
+        )
+        token outputs:mtlx:surface.connect = </Root/LanternGlass/Surface.outputs:out>
+        token outputs:realitykit:vertex
+        float2 ui:nodegraph:node:pos = (0, 0)
+        float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (300, 100)
+
+        def Shader "TexCoord"
+        {
+            uniform token info:id = "ND_texcoord_vector2"
+            int inputs:index = 0
+            float2 outputs:out
+            float2 ui:nodegraph:node:pos = (-700, 0)
+        }
+
+        def Shader "Separate"
+        {
+            uniform token info:id = "ND_separate2_vector2"
+            float2 inputs:in.connect = </Root/LanternGlass/TexCoord.outputs:out>
+            float outputs:outx
+            float outputs:outy
+            float2 ui:nodegraph:node:pos = (-520, 0)
+        }
+
+        def Shader "LowEdge"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1.connect = </Root/LanternGlass.inputs:fill>
+            float inputs:in2.connect = </Root/LanternGlass.inputs:softness>
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-520, 140)
+        }
+
+        def Shader "Step"
+        {
+            uniform token info:id = "ND_smoothstep_float"
+            float inputs:in.connect = </Root/LanternGlass/Separate.outputs:outy>
+            float inputs:low.connect = </Root/LanternGlass/LowEdge.outputs:out>
+            float inputs:high.connect = </Root/LanternGlass.inputs:fill>
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-340, 60)
+        }
+
+        def Shader "Mask"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1 = 1
+            float inputs:in2.connect = </Root/LanternGlass/Step.outputs:out>
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-180, 60)
+        }
+
+        def Shader "Glow"
+        {
+            uniform token info:id = "ND_multiply_color3FA"
+            color3f inputs:in1.connect = </Root/LanternGlass.inputs:glowColor>
+            float inputs:in2.connect = </Root/LanternGlass.inputs:glowIntensity>
+            color3f outputs:out
+            float2 ui:nodegraph:node:pos = (-340, 260)
+        }
+
+        def Shader "Emissive"
+        {
+            uniform token info:id = "ND_multiply_color3FA"
+            color3f inputs:in1.connect = </Root/LanternGlass/Glow.outputs:out>
+            float inputs:in2.connect = </Root/LanternGlass/Mask.outputs:out>
+            color3f outputs:out
+            float2 ui:nodegraph:node:pos = (-20, 160)
+        }
+
+        def Shader "Surface"
+        {
+            uniform token info:id = "ND_realitykit_pbr_surfaceshader"
+            color3f inputs:baseColor.connect = </Root/LanternGlass.inputs:glassColor>
+            color3f inputs:emissiveColor.connect = </Root/LanternGlass/Emissive.outputs:out>
+            float inputs:metallic = 0
+            float inputs:opacity.connect = </Root/LanternGlass.inputs:glassOpacity>
+            float inputs:roughness = 0.1
+            bool inputs:hasPremultipliedAlpha = 0
+            token outputs:out
+            float2 ui:nodegraph:node:pos = (160, 100)
+        }
+    }
+}

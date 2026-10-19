@@ -20,12 +20,16 @@ final class PortRig {
     static let sealTint = UIColor(red: 0.95, green: 0.9, blue: 0.85, alpha: 1)
 
     let root = Entity()
+    /// The port visual. With a designed `port_ring` the disc mesh is hidden and
+    /// the model hangs under it, so scale, position and opacity still apply.
     let disc: ModelEntity
     let sparkles: [ModelEntity]
     let mark: ModelEntity
     let seal: ModelEntity
+    private let ringModel: Entity?
+    private let markModel: Entity?
 
-    init(sparkleCount: Int) {
+    init(sparkleCount: Int, assets: AssetCatalog? = nil) {
         root.name = "portRoot"
         root.components.set(OpacityComponent(opacity: 1))
 
@@ -34,6 +38,11 @@ final class PortRig {
         disc.name = "portDisc"
         disc.components.set(OpacityComponent(opacity: 1))
         root.addChild(disc)
+        ringModel = assets?.model(.portRing)
+        if let ringModel {
+            disc.components.remove(ModelComponent.self)
+            disc.addChild(ringModel)
+        }
 
         var list: [ModelEntity] = []
         for i in 0..<max(1, sparkleCount) {
@@ -53,6 +62,11 @@ final class PortRig {
         mark.components.set(OpacityComponent(opacity: 0))
         mark.isEnabled = false
         root.addChild(mark)
+        markModel = assets?.model(.chargeMark)
+        if let markModel {
+            mark.components.remove(ModelComponent.self)
+            mark.addChild(markModel)
+        }
 
         var sealMaterial = PhysicallyBasedMaterial()
         sealMaterial.baseColor = .init(tint: Self.sealTint)
@@ -72,8 +86,13 @@ final class PortRig {
         root.components[OpacityComponent.self]?.opacity = pose.opacity
     }
 
+    /// Procedural: retint the disc. Designed: drive any material named `Glow`.
     func setDisc(tint: UIColor, emissive: Float) {
-        disc.model?.materials = [Self.discMaterial(tint: tint, emissive: emissive)]
+        if let ringModel {
+            AssetCatalog.setGlow(emissive, tint: tint, in: ringModel)
+        } else {
+            disc.model?.materials = [Self.discMaterial(tint: tint, emissive: emissive)]
+        }
     }
 
     /// Place the sparkles on an orbit around the disc at `phase` radians.

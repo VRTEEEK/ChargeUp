@@ -10,11 +10,23 @@ import ChargeUpCore
 final class LanternSky {
     let root = Entity()
     private let config: SkyConfig
+    private let assets: AssetCatalog
     private var lanterns: [ChargeObjectEntity] = []
 
-    init(config: SkyConfig) {
+    init(config: SkyConfig, assets: AssetCatalog) {
         self.config = config
+        self.assets = assets
         root.name = "lanternSky"
+    }
+
+    /// A record whose variant names a slot gets that model; "lantern" cycles
+    /// through the three variants; anything missing falls back to the hero
+    /// model, then to the placeholder.
+    private func model(for session: SessionRecord, index: Int) -> Entity? {
+        if let slot = AssetSlot(rawValue: session.variant), let m = assets.model(slot) { return m }
+        let variants = AssetSlot.lanternVariants
+        if let m = assets.model(variants[index % variants.count]) { return m }
+        return assets.model(.lanternHero)
     }
 
     var count: Int { lanterns.count }
@@ -36,7 +48,7 @@ final class LanternSky {
         for l in lanterns { l.root.removeFromParent() }
         lanterns = []
         for (index, session) in sessions.enumerated() {
-            let lantern = ChargeObjectEntity()
+            let lantern = ChargeObjectEntity(model: model(for: session, index: index))
             lantern.root.position = slot(index)
             lantern.root.scale = SIMD3(repeating: Float(config.smallScale))
             lantern.apply(.lit)
