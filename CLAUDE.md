@@ -5,15 +5,15 @@ Working instructions for building the ARR hackathon prototype.
 
 ## What we are building
 
-Charge Up is a two-device prototype for the Asymmetric Reframed Reality hackathon (Goldsmiths/KCL, 4 to 6 November 2026). A child wearing Apple Vision Pro in passthrough has an injection; the nurse, with no headset, runs the procedure from an iPad with one button. The child sees the real nurse and parent, but their own forearm, the needle and the near space are replaced by a charging scene: the injection is energy flowing in, not an object going in. A phone in the child's free hand plays a rising haptic ramp during the injection.
+Charge Up is a two-device prototype for the Asymmetric Reframed Reality hackathon (Goldsmiths/KCL, 4 to 6 November 2026), built for children on long-term chemotherapy. A child wearing Apple Vision Pro in passthrough sits through a day-care session: the port needle goes in, the line is flushed, a long infusion runs, and at the end the port is de-accessed. The nurse, with no headset, runs the session from an iPad with one button. The child sees the real nurse and parent, but their own access site, the needle and the near space are replaced by a charging scene: the infusion is energy flowing into a lantern, not a drug going in. Each session charges one lantern, and the lantern persists: every session adds a lit lantern to a sky the child sees again next time. A phone in the child's free hand plays a rising haptic ramp at the needle moment.
 
 The hackathon version is a fixed seven-step sequence, one charging object, one scene. The demo is on a seated adult volunteer with a judge playing the nurse. Deadline for a working end-to-end demo: 3 November, before the event.
 
 Design rules that override any implementation convenience:
 
-1. **Honest, not hidden.** Nothing in the child's view pretends the injection is not happening. Each real sensation has exactly one visible counterpart, at the same place on the arm, at the same instant.
+1. **Honest, not hidden.** Nothing in the child's view pretends the needle is not happening. Each real sensation has exactly one visible counterpart, at the same place on the access site, at the same instant.
 2. **Human-timed sync.** The needle moment fires only when the nurse taps Connect. Never infer it from sensors, timers or animation length.
-3. **Cooperation is the mechanic.** The charge only progresses while the child's arm is still and their head is turned toward the port. Compliance is something the child does, not something they are told.
+3. **Stillness and attention are required only at the needle moment.** During the infusion the child is free to move, rest or sleep; the lantern charges on its own time and invites the child back rather than holding them.
 4. **No text, no controllers, no menus in the child's view.** One gesture: hold still.
 5. **Congruency map is data.** Every visual, sound and haptic belongs to a row in the sequence JSON. If it has no row, it does not ship.
 
@@ -208,10 +208,10 @@ Device checks I will run myself, in this order, with your checklist: forearm anc
 
 Do not build any of these, even if they seem small. They belong to the post-hackathon version.
 
-- Multiple collectible objects or any persistence between sessions
 - Child-size headset fit, calibration flows, or onboarding screens
 - Clinical data logging beyond the per-session CSV
 - Accounts, cloud sync, analytics, crash reporting
-- Procedures other than a single-arm injection
 - Voice, speech or AI-driven content of any kind
 - Any visual that does not map to a row in sequence.json
+- Cloud sync of the lantern sky; the headset is the only store for now
+- The end-of-treatment rising ceremony
