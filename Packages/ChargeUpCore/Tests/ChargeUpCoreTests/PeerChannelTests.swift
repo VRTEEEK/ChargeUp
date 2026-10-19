@@ -230,3 +230,44 @@ import Testing
         #expect(await waitUntil(5) { nurse2.currentStepId == StepID.flush })
     }
 }
+
+
+@Suite(.serialized) struct MeshLoopbackTests {
+    @MainActor
+    private func waitUntil(_ timeout: TimeInterval, _ condition: () -> Bool) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() { return true }
+            try? await Task.sleep(for: .milliseconds(50))
+        }
+        return condition()
+    }
+
+    @Test @MainActor func companionsOnlyCountAsLinkedWhileTheHeadsetIsThere() async throws {
+        try #require(ProcessInfo.processInfo.environment["CHARGEUP_SKIP_LOOPBACK"] != "1")
+        let service = "cu-test-\(String(UInt16.random(in: 0...0xFFFF), radix: 16))"
+        let host = PeerChannel(role: .vision, serviceType: service, displayName: "vision-mesh")
+        let nurse = PeerChannel(role: .nurse, serviceType: service, displayName: "nurse-mesh")
+        let haptic = PeerChannel(role: .haptic, serviceType: service, displayName: "haptic-mesh")
+        defer { host.stop(); nurse.stop(); haptic.stop() }
+
+        host.start()
+        nurse.start()
+        haptic.start()
+        try #require(await waitUntil(30) { nurse.isConnected && haptic.isConnected && host.peers.count == 2 })
+        #expect(nurse.hostPeer?.id == "vision-mesh")
+        // Multipeer makes a mesh: the nurse can see the haptic phone too. That must not count as linked.
+        _ = await waitUntil(5) { nurse.peers.count == 2 }
+
+        host.stop()
+        #expect(await waitUntil(20) { !nurse.isConnected && !haptic.isConnected }, "headset gone: companions are not linked")
+        #expect(await waitUntil(10) { nurse.peers.isEmpty && haptic.peers.isEmpty }, "and they left the mesh: nurse \(nurse.peers) haptic \(haptic.peers)")
+
+        // A headset comes back on the same service: both companions find it again.
+        let host2 = PeerChannel(role: .vision, serviceType: service, displayName: "vision-mesh-2")
+        defer { host2.stop() }
+        host2.start()
+        #expect(await waitUntil(40) { nurse.hostPeer?.id == "vision-mesh-2" && haptic.hostPeer?.id == "vision-mesh-2" })
+        #expect(await waitUntil(5) { host2.peers.count == 2 })
+    }
+}

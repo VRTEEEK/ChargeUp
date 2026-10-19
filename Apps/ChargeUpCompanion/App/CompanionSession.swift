@@ -24,8 +24,9 @@ final class CompanionSession: ObservableObject {
         self.channel = PeerChannel(role: role)
         self.mirror = SessionMirror(sequence: sequence, channel: channel)
         self.rehearsal = RehearsalDriver(mirror: mirror, interval: sequence.config.rehearsalInterval)
+        // Linked means the headset is here, not merely some other companion in the mesh.
         channel.$peers
-            .map { !$0.isEmpty }
+            .map { peers in peers.contains { $0.role == .vision } }
             .removeDuplicates()
             .assign(to: &$isConnected)
         $isConnected

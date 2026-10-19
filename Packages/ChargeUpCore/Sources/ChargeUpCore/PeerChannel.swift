@@ -92,6 +92,7 @@ public struct MessageLog: Equatable, Sendable {
 /// `Envelope`s as JSON, always sent reliably so ordering is preserved.
 @MainActor
 public final class PeerChannel: ObservableObject {
+    private static let logger = Logger(subsystem: "com.vrteek.chargeup", category: "channel")
     /// Bonjour service `_chargeup._tcp` (Multipeer appends the transport).
     public static let defaultServiceType = "chargeup"
 
@@ -105,7 +106,13 @@ public final class PeerChannel: ObservableObject {
     /// Last transport-level note, for the operator window only.
     @Published public private(set) var lastDiagnostic = ""
 
-    public var isConnected: Bool { !peers.isEmpty }
+    /// The headset, once its hello has arrived. Nil on the headset itself.
+    public var hostPeer: PeerInfo? { peers.first { $0.role == .vision } }
+
+    /// For the headset: any companion connected. For a companion: the headset
+    /// is connected. Multipeer puts every companion into one mesh, so "some
+    /// peer is connected" would stay true after the headset went away.
+    public var isConnected: Bool { isHost ? !peers.isEmpty : hostPeer != nil }
 
     public var onMessage: ((Message, PeerInfo) -> Void)?
     public var onPeerJoined: ((PeerInfo) -> Void)?
@@ -157,6 +164,7 @@ public final class PeerChannel: ObservableObject {
             let data = try MessageCodec.encode(envelope)
             transport.send(data, to: names)
             for name in names { record(.sent, envelope, peer: name) }
+            Self.logger.info("sent \(envelope.message.typeName, privacy: .public) seq \(envelope.seq) to \(names.joined(separator: ","), privacy: .public)")
         } catch {
             note("encode failed: \(error)")
         }
@@ -192,10 +200,15 @@ public final class PeerChannel: ObservableObject {
         }
         guard let message = gate.accept(envelope, from: name) else {
             record(.dropped, envelope, peer: name)
+            Self.logger.info("dropped stale \(envelope.message.typeName, privacy: .public) seq \(envelope.seq) from \(name, privacy: .public)")
             return
         }
         record(.received, envelope, peer: name)
-        guard let index = peers.firstIndex(where: { $0.id == name }) else { return }
+        guard let index = peers.firstIndex(where: { $0.id == name }) else {
+            Self.logger.error("received \(envelope.message.typeName, privacy: .public) seq \(envelope.seq) from \(name, privacy: .public) before it was connected; dropped")
+            return
+        }
+        Self.logger.info("received \(envelope.message.typeName, privacy: .public) seq \(envelope.seq) from \(name, privacy: .public)")
         if case .hello(let role) = message {
             peers[index].role = role
             onPeerJoined?(peers[index])
@@ -245,6 +258,14 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
     private var connected: [String: MCPeerID] = [:]
+    /// The one host we have invited and are waiting on. Two headsets in a
+    /// room must not both be invited: Multipeer would merge the sessions into
+    /// one mesh and the nurse would drive both.
+    private var pendingInvite: String?
+    /// Browser mode: the headset we invited. When it leaves we disconnect from
+    /// everyone (the other companions are only reachable through its session)
+    /// and browse again.
+    private var hostName: String?
     private var running = false
 
     weak var channel: PeerChannel?
@@ -280,6 +301,8 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
             session?.disconnect()
             session = nil
             connected.removeAll()
+            pendingInvite = nil
+            hostName = nil
         }
     }
 
@@ -310,6 +333,8 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
 
     private func startBrowsing() {
         guard running else { return }
+        pendingInvite = nil
+        if connected.isEmpty { hostName = nil }
         browser?.stopBrowsingForPeers()
         let browser = MCNearbyServiceBrowser(peer: myPeerID, serviceType: serviceType)
         browser.delegate = self
@@ -339,11 +364,28 @@ extension MultipeerTransport: MCSessionDelegate {
             switch state {
             case .connected:
                 connected[name] = peerID
+                if pendingInvite == name { pendingInvite = nil }
                 Task { @MainActor [weak channel] in channel?.transportPeerConnected(name) }
             case .notConnected:
+                if pendingInvite == name { pendingInvite = nil }
                 let wasConnected = connected.removeValue(forKey: name) != nil
                 Task { @MainActor [weak channel] in channel?.transportPeerDisconnected(name) }
-                if wasConnected || mode == .browser { scheduleRebrowse() }
+                if mode == .browser, name == hostName {
+                    // The headset is gone: leave the mesh so we can find it (or another) again.
+                    hostName = nil
+                    let others = Array(connected.keys)
+                    connected.removeAll()
+                    session.disconnect()
+                    let fresh = MCSession(peer: myPeerID, securityIdentity: nil, encryptionPreference: .required)
+                    fresh.delegate = self
+                    self.session = fresh
+                    for other in others {
+                        Task { @MainActor [weak channel] in channel?.transportPeerDisconnected(other) }
+                    }
+                    scheduleRebrowse()
+                } else if wasConnected || mode == .browser {
+                    scheduleRebrowse()
+                }
             case .connecting:
                 break
             @unknown default:
@@ -378,9 +420,17 @@ extension MultipeerTransport: MCNearbyServiceAdvertiserDelegate {
 extension MultipeerTransport: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
         queue.async { [self] in
-            guard running, let session, connected.isEmpty else { return }
+            guard running, let session, connected.isEmpty, pendingInvite == nil else { return }
+            pendingInvite = peerID.displayName
+            hostName = peerID.displayName
             notify("found \(peerID.displayName), inviting")
             browser.invitePeer(peerID, to: session, withContext: nil, timeout: Self.inviteTimeout)
+            // If the invitation neither connects nor fails, free the slot after the timeout.
+            queue.asyncAfter(deadline: .now() + Self.inviteTimeout + 1) { [weak self] in
+                guard let self, pendingInvite == peerID.displayName, connected.isEmpty else { return }
+                pendingInvite = nil
+                startBrowsing()
+            }
         }
     }
 
