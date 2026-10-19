@@ -46,15 +46,24 @@
       "advance": { "kind": "nurseTap", "label": "DONE" } }
   ],
   "prompts": {
-    "idle": "We're getting your lantern ready.",
-    "cream": "The cream is making the port sleepy. Nothing to do yet.",
-    "clean": "Watch the port, it's getting cold and shiny.",
-    "countdown": "Big breath in, hold still, it's about to connect.",
-    "connect": "There's the click. Look at the port.",
-    "flush": "Here comes the first spark. Watch it climb.",
-    "charge": "Your lantern is filling on its own. Rest if you like.",
-    "release": "And out. Watch your lantern rise.",
-    "complete": "All charged. That one's yours now."
+    "idle":      { "en": "We're getting your lantern ready.",
+                   "ar": "نجهّز فانوسك الآن." },
+    "cream":     { "en": "The cream is making the port sleepy. Nothing to do yet.",
+                   "ar": "الكريم يُنيّم مكان الإبرة. لا شيء عليك فعله الآن." },
+    "clean":     { "en": "Watch the port, it's getting cold and shiny.",
+                   "ar": "انظر إلى المنفذ، يصبح بارداً ولامعاً." },
+    "countdown": { "en": "Big breath in, hold still, it's about to connect.",
+                   "ar": "خذ نفساً عميقاً، وابقَ ثابتاً، سيتصل الآن." },
+    "connect":   { "en": "There's the click. Look at the port.",
+                   "ar": "ها هي الطقطقة. انظر إلى المنفذ." },
+    "flush":     { "en": "Here comes the first spark. Watch it climb.",
+                   "ar": "ها هي الشرارة الأولى. شاهدها تصعد." },
+    "charge":    { "en": "Your lantern is filling on its own. Rest if you like.",
+                   "ar": "فانوسك يمتلئ وحده. ارتَح إن أحببت." },
+    "release":   { "en": "And out. Watch your lantern rise.",
+                   "ar": "وخرجت. شاهد فانوسك يرتفع." },
+    "complete":  { "en": "All charged. That one's yours now.",
+                   "ar": "اكتمل الشحن. هذا الفانوس لك الآن." }
   },
   "config": {
     "visuals": {

@@ -24,21 +24,38 @@ import Testing
         #expect(seq.config.headOnPortDegrees == 25)
     }
 
-    @Test func everyStepHasAPrompt() throws {
+    @Test func everyStepHasAPromptInEveryLanguage() throws {
         let seq = try ChargeSequence.shipped()
-        for step in seq.steps { #expect(!seq.prompt(for: step.id).isEmpty, Comment(rawValue: step.id)) }
-        #expect(!seq.prompt(for: SessionMarker.idle).isEmpty)
-        #expect(!seq.prompt(for: SessionMarker.complete).isEmpty)
+        for step in seq.steps {
+            for language in PromptLanguage.allCases {
+                #expect(!seq.prompt(for: step.id, in: language).isEmpty, Comment(rawValue: "\(step.id) \(language)"))
+            }
+        }
+        #expect(!seq.prompt(for: SessionMarker.idle, in: .ar).isEmpty)
+        #expect(!seq.prompt(for: SessionMarker.complete, in: .ar).isEmpty)
         #expect(seq.prompt(for: StepID.charge).contains("filling"))
+        #expect(seq.prompt(for: StepID.charge, in: .ar).contains("يمتلئ"))
         #expect(seq.prompt(for: "nope").isEmpty)
+        #expect(PromptLanguage.ar.isRightToLeft && !PromptLanguage.en.isRightToLeft)
     }
 
     @Test func missingPromptFails() throws {
         var json = try shippedJSON()
-        var prompts = json["prompts"] as! [String: String]
+        var prompts = json["prompts"] as! [String: Any]
         prompts.removeValue(forKey: "charge")
         json["prompts"] = prompts
         #expect(throws: SequenceError.missingPrompt(StepID.charge)) { try load(json) }
+    }
+
+    @Test func missingLanguageFails() throws {
+        var json = try shippedJSON()
+        var prompts = json["prompts"] as! [String: Any]
+        prompts["flush"] = ["en": "Here comes the first spark."]
+        json["prompts"] = prompts
+        #expect(throws: DecodingError.self) { try load(json) }
+        prompts["flush"] = ["en": "Here comes the first spark.", "ar": " "]
+        json["prompts"] = prompts
+        #expect(throws: SequenceError.missingPrompt(StepID.flush)) { try load(json) }
     }
 
     @Test func visualsConfigMatchesPerceivedText() throws {

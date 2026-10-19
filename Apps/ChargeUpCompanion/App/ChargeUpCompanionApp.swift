@@ -10,28 +10,46 @@ struct ChargeUpCompanionApp: App {
     }
 }
 
+/// Persisted choice of prompt language. Arabic lays the whole companion
+/// out right to left at the same type sizes.
+struct LanguageSetting {
+    static let key = "chargeup.language"
+
+    static func read() -> PromptLanguage {
+        PromptLanguage(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .en
+    }
+}
+
 /// Role picker on launch, then the role's view. Picking a role opens the
 /// channel; leaving it closes the channel.
 struct RootView: View {
     @State private var session: CompanionSession?
+    @AppStorage(LanguageSetting.key) private var languageRaw: String = PromptLanguage.en.rawValue
+
+    private var language: PromptLanguage { PromptLanguage(rawValue: languageRaw) ?? .en }
 
     var body: some View {
-        if let session {
-            RoleView(session: session) {
-                session.stop()
-                self.session = nil
-            }
-        } else {
-            RolePicker { role in
-                let s = CompanionSession(role: role)
-                s.start()
-                session = s
+        Group {
+            if let session {
+                RoleView(session: session, language: language) {
+                    session.stop()
+                    self.session = nil
+                }
+            } else {
+                RolePicker(languageRaw: $languageRaw) { role in
+                    let s = CompanionSession(role: role)
+                    s.start()
+                    session = s
+                }
             }
         }
+        .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
+        .environment(\.locale, Locale(identifier: language.localeIdentifier))
     }
 }
 
 struct RolePicker: View {
+    @Binding var languageRaw: String
     let pick: (Role) -> Void
 
     var body: some View {
@@ -41,6 +59,12 @@ struct RolePicker: View {
             Text("Who is this device?")
                 .font(.title2)
                 .foregroundStyle(.secondary)
+            Picker("Language", selection: $languageRaw) {
+                Text("English").tag(PromptLanguage.en.rawValue)
+                Text("العربية").tag(PromptLanguage.ar.rawValue)
+            }
+            .pickerStyle(.segmented)
+            .frame(maxWidth: 320)
             ForEach([Role.nurse, .parent, .haptic], id: \.self) { role in
                 Button {
                     pick(role)
@@ -58,13 +82,14 @@ struct RolePicker: View {
 
 struct RoleView: View {
     @ObservedObject var session: CompanionSession
+    let language: PromptLanguage
     let leave: () -> Void
 
     var body: some View {
         Group {
             switch session.role {
             case .nurse: NurseView(session: session)
-            case .parent: ParentView(session: session)
+            case .parent: ParentView(session: session, language: language)
             case .haptic: HapticView(session: session)
             case .vision: Text("This app never runs as vision.")
             }

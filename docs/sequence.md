@@ -46,7 +46,7 @@ Stillness and attention are asked for at steps 3 and 4 only. The reducer's two g
 - **Headset (`vision` role)** hosts the session. It runs the reducer and a 10 Hz tick, broadcasts `stepChanged` on every phase change, `presence` on every tick, and hands a newly joined companion the current step.
 - **Nurse** sends `stepChanged(next step)` as a request, or `connect` on the countdown step, or `reset`. The host only honours a request for the step immediately after the current one, so a double tap cannot skip.
 - **Haptic** reacts only to each step's `haptic` field: `pulse` taps once, `ramp` runs for `rampDurationMs` and ends on its own, `none` does nothing (so the ramp started at the needle moment is not cut off). Idle and complete stop it.
-- **Parent** mirrors the step list. The prompt line is Milestone 3.
+- **Parent** mirrors the step list, shows the prompt for the current step in the chosen language (`prompts` carries `en` and `ar` for every step plus `idle` and `complete`; decoding fails if either is missing), and lists the lanterns from `skyState` with a count. Arabic lays the companion out right to left at the same type sizes; the choice is made on the role picker and persisted.
 
 Reserved step ids in `stepChanged` that are not rows: `idle`, `complete`.
 

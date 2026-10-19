@@ -345,6 +345,32 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     }
 }
 
+/// Languages every prompt must carry. Decoding fails if one is missing.
+public enum PromptLanguage: String, Codable, CaseIterable, Sendable {
+    case en, ar
+
+    public var isRightToLeft: Bool { self == .ar }
+    public var localeIdentifier: String { rawValue }
+}
+
+/// One line the parent reads out, in every language.
+public struct Prompt: Codable, Equatable, Sendable {
+    public var en: String
+    public var ar: String
+
+    public init(en: String, ar: String) {
+        self.en = en
+        self.ar = ar
+    }
+
+    public func text(_ language: PromptLanguage) -> String {
+        switch language {
+        case .en: return en
+        case .ar: return ar
+        }
+    }
+}
+
 /// Step ids the apps key behaviour on. The Vision app renders visuals by id,
 /// the reducer gates `connect` on the countdown step and accrues charge on
 /// the charge step. Content, order, labels and timing still come from JSON.
@@ -381,12 +407,14 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
     public var version: Int
     public var object: String
     public var steps: [Step]
-    /// What the parent says, keyed by step id plus `idle` and `complete`.
-    public var prompts: [String: String]
+    /// What the parent says, keyed by step id plus `idle` and `complete`, in every language.
+    public var prompts: [String: Prompt]
     public var config: SequenceConfig
 
     /// The parent's line for a step id or session marker. Empty if none.
-    public func prompt(for id: String) -> String { prompts[id] ?? "" }
+    public func prompt(for id: String, in language: PromptLanguage = .en) -> String {
+        prompts[id]?.text(language) ?? ""
+    }
 
     /// Decode and validate. Throws on any missing field, bad value, duplicate
     /// id, or a missing step that the reducer depends on.
@@ -413,9 +441,10 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
         for required in [StepID.countdown, StepID.charge] where !seen.contains(required) {
             throw SequenceError.missingStep(required)
         }
-        for id in steps.map(\.id) + [SessionMarker.idle, SessionMarker.complete]
-        where (prompts[id] ?? "").trimmingCharacters(in: .whitespaces).isEmpty {
-            throw SequenceError.missingPrompt(id)
+        for id in steps.map(\.id) + [SessionMarker.idle, SessionMarker.complete] {
+            guard let p = prompts[id],
+                  PromptLanguage.allCases.allSatisfy({ !p.text($0).trimmingCharacters(in: .whitespaces).isEmpty })
+            else { throw SequenceError.missingPrompt(id) }
         }
     }
 
