@@ -13,6 +13,9 @@ public enum Message: Equatable, Sendable {
     case connect(nurseTimestamp: TimeInterval)
     case presence(headOnPort: Bool, armStill: Bool, charge: Double)
     case reset
+    /// The lantern sky: every completed session on the headset. Sent to a
+    /// companion when it joins and after each release.
+    case skyState(sessions: [SessionRecord])
 
     public var typeName: String {
         switch self {
@@ -21,13 +24,14 @@ public enum Message: Equatable, Sendable {
         case .connect: return "connect"
         case .presence: return "presence"
         case .reset: return "reset"
+        case .skyState: return "skyState"
         }
     }
 }
 
 extension Message: Codable {
     private enum CodingKeys: String, CodingKey {
-        case type, role, stepId, hostTimestamp, nurseTimestamp, headOnPort, armStill, charge
+        case type, role, stepId, hostTimestamp, nurseTimestamp, headOnPort, armStill, charge, sessions
     }
 
     public init(from decoder: Decoder) throws {
@@ -47,6 +51,8 @@ extension Message: Codable {
                              charge: try c.decode(Double.self, forKey: .charge))
         case "reset":
             self = .reset
+        case "skyState":
+            self = .skyState(sessions: try c.decode([SessionRecord].self, forKey: .sessions))
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type, in: c, debugDescription: "unknown message type '\(type)'")
@@ -70,6 +76,8 @@ extension Message: Codable {
             try c.encode(charge, forKey: .charge)
         case .reset:
             break
+        case .skyState(let sessions):
+            try c.encode(sessions, forKey: .sessions)
         }
     }
 }
@@ -91,9 +99,14 @@ public enum MessageCodec {
     private static let encoder: JSONEncoder = {
         let e = JSONEncoder()
         e.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
+        e.dateEncodingStrategy = .iso8601
         return e
     }()
-    private static let decoder = JSONDecoder()
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
 
     public static func encode(_ envelope: Envelope) throws -> Data {
         try encoder.encode(envelope)

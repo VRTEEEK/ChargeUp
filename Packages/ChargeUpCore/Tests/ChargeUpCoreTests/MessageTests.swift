@@ -10,6 +10,11 @@ import Testing
         .connect(nurseTimestamp: 42.25),
         .presence(headOnPort: true, armStill: false, charge: 0.375),
         .reset,
+        .skyState(sessions: [
+            SessionRecord(date: Date(timeIntervalSince1970: 1_700_000_000), variant: "lantern", fill: 1.0),
+            SessionRecord(date: Date(timeIntervalSince1970: 1_701_000_000), variant: "lantern", fill: 0.8, seeded: true),
+        ]),
+        .skyState(sessions: []),
     ]
 
     @Test(arguments: everyCase) func roundTrips(_ message: Message) throws {

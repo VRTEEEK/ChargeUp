@@ -80,8 +80,10 @@ import Testing
         let connected = await waitUntil(Self.discoveryTimeout) { host.channel.isConnected && nurse.channel.isConnected }
         try #require(connected, "channels did not connect")
 
-        // Companion joins while idle and is told so.
+        // Companion joins while idle and is told so, and gets the sky.
+        host.updateSky([SessionRecord(date: Date(timeIntervalSince1970: 1_700_000_000), variant: "lantern", fill: 1)])
         #expect(await waitUntil(Self.messageTimeout) { nurse.channel.peers.first?.role == .vision })
+        #expect(await waitUntil(Self.messageTimeout) { nurse.sessions.count == 1 })
         #expect(nurse.isIdle)
         #expect(nurse.buttonLabel == SessionMirror.startLabel)
 
@@ -112,6 +114,9 @@ import Testing
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.release })
         #expect(nurse.buttonLabel == "DONE")
+        // After release the app appends to the sky and the host broadcasts it.
+        host.updateSky(host.skySessions + [SessionRecord(date: Date(), variant: "lantern", fill: 0.5)])
+        #expect(await waitUntil(Self.messageTimeout) { nurse.sessions.count == 2 })
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.isComplete })
         #expect(nurse.buttonLabel == SessionMirror.resetLabel)

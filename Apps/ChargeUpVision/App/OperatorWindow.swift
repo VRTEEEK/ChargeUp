@@ -93,6 +93,13 @@ struct OperatorWindow: View {
             LabeledContent("Lantern", value: controller.lanternPlacement)
             LabeledContent("Audio", value: controller.audioStatus)
             LabeledContent("Recording", value: controller.lastRecording)
+            LabeledContent("Sky") {
+                HStack {
+                    Text(controller.skyStatus)
+                    Button("Reset Sky", role: .destructive) { controller.resetSky() }
+                        .font(.footnote)
+                }
+            }
             LabeledContent("Link", value: controller.host.channel.lastDiagnostic)
                 .font(.footnote)
                 .foregroundStyle(.secondary)

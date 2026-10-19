@@ -26,6 +26,11 @@ final class SessionController: ObservableObject {
     /// Last per-session CSV written to Documents, for the operator window.
     @Published private(set) var lastRecording = "none yet"
     private var recorder = SessionRecorder()
+    /// The lantern sky on this headset. Seeded on first launch from config.sky.
+    private var store: SessionStore?
+    @Published private(set) var skySessions: [SessionRecord] = []
+    @Published private(set) var skyStatus = "not loaded"
+    var onSkyChanged: (([SessionRecord]) -> Void)?
     private var bag = Set<AnyCancellable>()
 
     init() {
@@ -44,6 +49,7 @@ final class SessionController: ObservableObject {
             portSource = ForearmAnchor(config: forearm)
             isSimulatedForearm = false
         }
+        loadSky()
         host.onTick = { [weak self] state, now in self?.recordTick(state, at: now) }
         host.onPhaseChanged = { [weak self] state in self?.phaseChanged(state) }
         host.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
@@ -69,6 +75,54 @@ final class SessionController: ObservableObject {
         debugControl.stop()
         host.stop()
         finishRecording()
+    }
+
+    // MARK: Lantern sky
+
+    private func loadSky() {
+        guard let dir = documentsDirectory else { return }
+        do {
+            var s = try SessionStore(directory: dir)
+            if s.count == 0, sequence.config.sky.seededSessions > 0 {
+                try s.seed(count: sequence.config.sky.seededSessions, variant: sequence.object)
+            }
+            store = s
+            publishSky()
+        } catch {
+            skyStatus = "sessions.json failed: \(error.localizedDescription)"
+        }
+    }
+
+    private func publishSky() {
+        guard let store else { return }
+        skySessions = store.sorted
+        skyStatus = "\(store.count) lanterns"
+        host.updateSky(skySessions)
+        onSkyChanged?(skySessions)
+    }
+
+    /// Needle out: this session's lantern joins the sky and the record is written.
+    func sessionReleased() {
+        guard var s = store else { return }
+        do {
+            try s.append(SessionRecord(date: Date(), variant: sequence.object, fill: state.charge))
+            store = s
+            publishSky()
+        } catch {
+            skyStatus = "write failed: \(error.localizedDescription)"
+        }
+    }
+
+    /// Operator only. Clears sessions.json and re-seeds from config.
+    func resetSky() {
+        guard var s = store else { return }
+        do {
+            try s.reset(seeding: sequence.config.sky.seededSessions, variant: sequence.object)
+            store = s
+            publishSky()
+        } catch {
+            skyStatus = "reset failed: \(error.localizedDescription)"
+        }
     }
 
     // MARK: Recording (Milestone 3 task 3)

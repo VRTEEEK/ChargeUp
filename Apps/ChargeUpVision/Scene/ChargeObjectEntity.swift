@@ -24,28 +24,40 @@ final class ChargeObjectEntity {
     private static let frame = UIColor(red: 0.18, green: 0.16, blue: 0.14, alpha: 1)
 
     let root = Entity()
+    /// Everything visible hangs off `body`, so the lantern can rise while
+    /// `root` stays where the sky cluster is anchored.
+    let body = Entity()
     private let core: ModelEntity
     private let fill: ModelEntity
     private(set) var state: State = .dark
     /// 0...1 extra brightness while the child glances at the lantern during
     /// the infusion. Set by SceneDirector; decays on its own.
     var glance: Float = 0
+    /// Overall brightness multiplier for sky lanterns (a half-filled session glows less).
+    private var brightness: Float = 1
+
+    func setBrightness(_ value: Float) {
+        brightness = max(0, min(1, value))
+        apply(state)
+    }
 
     /// Where the cable leaves the lantern, in the lantern's local frame.
-    var cableSocket: SIMD3<Float> { SIMD3(0, Self.capHeight / 2, Self.bodyRadius) }
+    var cableSocket: SIMD3<Float> { body.convert(position: SIMD3(0, Self.capHeight / 2, Self.bodyRadius), to: root) }
 
     init() {
         root.name = "lantern"
+        body.name = "lanternBody"
+        root.addChild(body)
 
         var glassMaterial = PhysicallyBasedMaterial()
         glassMaterial.baseColor = .init(tint: Self.glass)
         glassMaterial.blending = .transparent(opacity: .init(floatLiteral: 0.22))
         glassMaterial.roughness = 0.1
         glassMaterial.metallic = 0.0
-        let body = ModelEntity(mesh: .generateCylinder(height: Self.bodyHeight, radius: Self.bodyRadius),
-                               materials: [glassMaterial])
-        body.name = "lanternBody"
-        root.addChild(body)
+        let glass = ModelEntity(mesh: .generateCylinder(height: Self.bodyHeight, radius: Self.bodyRadius),
+                                materials: [glassMaterial])
+        glass.name = "lanternGlass"
+        body.addChild(glass)
 
         var frameMaterial = PhysicallyBasedMaterial()
         frameMaterial.baseColor = .init(tint: Self.frame)
@@ -57,24 +69,24 @@ final class ChargeObjectEntity {
         let base = ModelEntity(mesh: .generateCylinder(height: Self.capHeight, radius: Self.bodyRadius + 0.006),
                                materials: [frameMaterial])
         base.position.y = -Self.bodyHeight / 2 - Self.capHeight / 2
-        root.addChild(cap)
-        root.addChild(base)
+        body.addChild(cap)
+        body.addChild(base)
         for i in 0..<4 {
             let bar = ModelEntity(mesh: .generateBox(width: 0.006, height: Self.bodyHeight, depth: 0.006),
                                   materials: [frameMaterial])
             let a = Float(i) * .pi / 2 + .pi / 4
             bar.position = SIMD3(cos(a) * Self.bodyRadius, 0, sin(a) * Self.bodyRadius)
-            root.addChild(bar)
+            body.addChild(bar)
         }
 
         core = ModelEntity(mesh: .generateSphere(radius: Self.coreRadius), materials: [Self.glowMaterial(intensity: 0.05)])
         core.name = "lanternCore"
-        root.addChild(core)
+        body.addChild(core)
 
         fill = ModelEntity(mesh: .generateCylinder(height: 1, radius: Self.fillRadius), materials: [Self.glowMaterial(intensity: 0.6)])
         fill.name = "lanternFill"
         fill.isEnabled = false
-        root.addChild(fill)
+        body.addChild(fill)
 
         apply(.dark)
     }
@@ -94,7 +106,8 @@ final class ChargeObjectEntity {
             fill.model?.materials = [Self.glowMaterial(intensity: 0.3 + 1.2 * g)]
             setFill(l)
         case .lit:
-            core.model?.materials = [Self.glowMaterial(intensity: 4.0)]
+            core.model?.materials = [Self.glowMaterial(intensity: 4.0 * brightness)]
+            fill.model?.materials = [Self.glowMaterial(intensity: 0.6 * brightness)]
             setFill(1)
         }
     }

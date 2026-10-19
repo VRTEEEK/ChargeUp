@@ -170,6 +170,22 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
 }
 
+/// The lantern sky: every completed session's lantern, kept on the headset.
+public struct SkyConfig: Codable, Equatable, Sendable {
+    /// Fake past sessions written on first launch so the demo sky is not empty.
+    public var seededSessions: Int
+    /// How long the current lantern takes to rise into the cluster at release.
+    public var riseSeconds: Double
+    /// Cluster placement relative to the current lantern: up, back, and side spread.
+    public var clusterHeightM: Double
+    public var clusterBehindM: Double
+    public var clusterSpreadM: Double
+    /// Scale of a sky lantern relative to the current one.
+    public var smallScale: Double
+
+    public var rise: TimeInterval { riseSeconds }
+}
+
 /// How the lantern fills during the infusion. Time-based by default: a
 /// real infusion runs for hours, the demo compresses it to demoDurationSec.
 public struct ChargeConfig: Codable, Equatable, Sendable {
@@ -258,6 +274,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var visuals: VisualsConfig
     public var audio: AudioConfig
     public var lantern: LanternConfig
+    public var sky: SkyConfig
     public var charge: ChargeConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
@@ -281,6 +298,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
         audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
+        sky = try c.decode(SkyConfig.self, forKey: .sky)
         charge = try c.decode(ChargeConfig.self, forKey: .charge)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
@@ -302,6 +320,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard rampDurationMs > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c, debugDescription: "rampDurationMs must be > 0")
+        }
+        guard sky.seededSessions >= 0, sky.riseSeconds > 0, sky.smallScale > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .sky, in: c, debugDescription: "sky config values out of range")
         }
         guard charge.demoDurationSec > 0, charge.glanceDegrees > 0, charge.glanceSeconds > 0 else {
             throw DecodingError.dataCorruptedError(

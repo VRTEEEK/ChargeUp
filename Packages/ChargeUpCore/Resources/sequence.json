@@ -83,6 +83,14 @@
       "simulatedForwardM": 0.7,
       "simulatedBelowHeadM": 0.12
     },
+    "sky": {
+      "seededSessions": 6,
+      "riseSeconds": 3,
+      "clusterHeightM": 0.55,
+      "clusterBehindM": 0.35,
+      "clusterSpreadM": 0.7,
+      "smallScale": 0.4
+    },
     "charge": {
       "gatedByPresence": false,
       "demoDurationSec": 90,

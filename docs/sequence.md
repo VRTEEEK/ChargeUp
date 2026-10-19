@@ -21,6 +21,9 @@ Stillness and attention are asked for at steps 3 and 4 only. The reducer's two g
 | `stillnessThresholdMps` | 0.05 | Vision, StillnessMonitor (M2); matters at the needle moment |
 | `stillnessWindowMs` | 300 | Vision, StillnessMonitor (M2) |
 | `headOnPortDegrees` | 25 | Vision, AttentionProxy (M2) |
+| `sky.seededSessions` | 6 | Vision: fake past sessions written to sessions.json on first launch so the demo sky is not empty; Reset Sky re-seeds |
+| `sky.riseSeconds` | 3 | Vision: the current lantern's rise into the cluster at release |
+| `sky.clusterHeightM`, `clusterBehindM`, `clusterSpreadM`, `smallScale` | 0.55, 0.35, 0.7, 0.4 | Vision: where past lanterns sit relative to the current one, and how small they are |
 | `charge.gatedByPresence` | false | SessionReducer: when true the fill only advances while armStill and headOnPort (the old rule) |
 | `charge.demoDurationSec` | 90 | SessionReducer: seconds for the fill to go 0 to 1; a real infusion is hours, the demo compresses it |
 | `charge.glanceDegrees`, `charge.glanceSeconds` | 20, 2.5 | Vision: a head turn toward the lantern during charge brightens it briefly, then it settles |
@@ -47,6 +50,8 @@ Stillness and attention are asked for at steps 3 and 4 only. The reducer's two g
 
 Reserved step ids in `stepChanged` that are not rows: `idle`, `complete`.
 
+The lantern sky lives only in `Documents/sessions.json` on the headset (one record per completed session: date, variant, fill reached, seeded flag). The record is written when `release` is entered.
+
 ## Wire format
 
 Every message is one JSON envelope sent reliably over MultipeerConnectivity (service `_chargeup._tcp`):
@@ -55,4 +60,4 @@ Every message is one JSON envelope sent reliably over MultipeerConnectivity (ser
 {"seq": 12, "message": {"type": "stepChanged", "stepId": "charge", "hostTimestamp": 1791815136.08}}
 ```
 
-Types: `hello{role}`, `stepChanged{stepId, hostTimestamp}`, `connect{nurseTimestamp}`, `presence{headOnPort, armStill, charge}`, `reset{}`. `seq` is monotonic per sender; receivers drop anything not greater than the last accepted `seq` from that sender. A `hello` always resets the gate for its sender.
+Types: `hello{role}`, `stepChanged{stepId, hostTimestamp}`, `connect{nurseTimestamp}`, `presence{headOnPort, armStill, charge}`, `reset{}`, `skyState{sessions: [{date (ISO 8601), variant, fill, seeded}]}`. The headset sends `skyState` to a companion when it joins and after every release. `seq` is monotonic per sender; receivers drop anything not greater than the last accepted `seq` from that sender. A `hello` always resets the gate for its sender.

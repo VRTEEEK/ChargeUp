@@ -20,6 +20,9 @@ public final class SessionHost: ObservableObject {
     /// holds its step while this is non-empty; a rejoining companion gets the
     /// current step, never a reset.
     @Published public private(set) var missingRoles: Set<Role> = []
+    /// The lantern sky as the app last gave it to us; sent to joining
+    /// companions and whenever it changes.
+    public private(set) var skySessions: [SessionRecord] = []
 
     public var clock: () -> TimeInterval = { Date().timeIntervalSince1970 }
     /// Called after every reduce that changed the phase.
@@ -114,18 +117,25 @@ public final class SessionHost: ObservableObject {
         }
     }
 
-    /// A companion just said hello: give it the current state, never a reset.
+    /// The app owns the store; the host owns the broadcast.
+    public func updateSky(_ sessions: [SessionRecord]) {
+        skySessions = sessions
+        channel.send(.skyState(sessions: sessions))
+    }
+
+    /// A companion just said hello: give it the current state and the sky, never a reset.
     private func sync(_ peer: PeerInfo) {
         if state.phase == .idle {
             channel.send(.stepChanged(stepId: SessionMarker.idle, hostTimestamp: clock()), to: peer)
         } else {
             channel.send(.stepChanged(stepId: currentStepId, hostTimestamp: clock()), to: peer)
         }
+        channel.send(.skyState(sessions: skySessions), to: peer)
     }
 
     private func receive(_ message: Message, from peer: PeerInfo) {
         switch message {
-        case .hello, .presence:
+        case .hello, .presence, .skyState:
             break
         case .reset:
             reset()
@@ -167,6 +177,8 @@ public final class SessionMirror: ObservableObject {
     @Published public private(set) var charge: Double = 0
     /// Milliseconds from sending `connect` to receiving the matching `stepChanged`.
     @Published public private(set) var lastConnectRoundTripMs: Double?
+    /// The lantern sky from the headset, oldest first.
+    @Published public private(set) var sessions: [SessionRecord] = []
 
     public var clock: () -> TimeInterval = { Date().timeIntervalSince1970 }
     /// Fired on every step change, with the step if it is a real row.
@@ -228,6 +240,8 @@ public final class SessionMirror: ObservableObject {
         switch message {
         case .hello, .connect:
             break
+        case .skyState(let sessions):
+            self.sessions = sessions.sorted { $0.date < $1.date }
         case .reset:
             setStep(SessionMarker.idle)
             charge = 0
