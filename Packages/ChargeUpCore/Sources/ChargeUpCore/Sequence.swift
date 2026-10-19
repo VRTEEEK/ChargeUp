@@ -173,28 +173,31 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
 /// Timings and counts for the per-step visuals. Each maps to a row's
 /// "perceived" text; nothing here invents a visual.
 public struct VisualsConfig: Codable, Equatable, Sendable {
-    /// hold: the port settles onto the arm over this long.
-    public var portLandingMs: Int
+    /// cream: the port glow grows under the skin over this long.
+    public var creamGlowMs: Int
     /// countdown: this many pulses of light, this far apart.
     public var countdownPulseCount: Int
     public var countdownPulseMs: Int
     /// connect: the cable reaches the port in this long.
     public var cableSnapMs: Int
+    /// flush: the first spark takes this long to climb the cable.
+    public var flushSparkMs: Int
     /// release: the cable pulls back in this long.
     public var cableRetractMs: Int
-    /// seal: the mark fades in over this long.
-    public var sealFadeMs: Int
+    /// release: the mark fades onto the dressing over this long.
+    public var markFadeMs: Int
     /// charge: energy packets along the cable, and their speed while flowing.
     public var flowPacketCount: Int
     public var flowSpeedMps: Double
     /// swab: sparkles orbiting the port.
     public var frostSparkleCount: Int
 
-    public var portLanding: TimeInterval { Double(portLandingMs) / 1000 }
+    public var creamGlow: TimeInterval { Double(creamGlowMs) / 1000 }
+    public var flushSpark: TimeInterval { Double(flushSparkMs) / 1000 }
     public var countdownPulse: TimeInterval { Double(countdownPulseMs) / 1000 }
     public var cableSnap: TimeInterval { Double(cableSnapMs) / 1000 }
     public var cableRetract: TimeInterval { Double(cableRetractMs) / 1000 }
-    public var sealFade: TimeInterval { Double(sealFadeMs) / 1000 }
+    public var markFade: TimeInterval { Double(markFadeMs) / 1000 }
 }
 
 /// Two spatial sources: per-step sounds at the port, the flow loop at the
@@ -285,7 +288,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
                 debugDescription: "rampDurationMs and chargeRatePerSecond must be > 0")
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
-              visuals.cableRetractMs > 0, visuals.sealFadeMs > 0, visuals.portLandingMs > 0,
+              visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,
               visuals.flowPacketCount > 0, visuals.flowSpeedMps > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .visuals, in: c, debugDescription: "visuals config values must be > 0")
@@ -304,13 +307,13 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 /// the reducer gates `connect` on the countdown step and accrues charge on
 /// the charge step. Content, order, labels and timing still come from JSON.
 public enum StepID {
-    public static let hold = "hold"
-    public static let swab = "swab"
+    public static let cream = "cream"
+    public static let clean = "clean"
     public static let countdown = "countdown"
     public static let connect = "connect"
+    public static let flush = "flush"
     public static let charge = "charge"
     public static let release = "release"
-    public static let seal = "seal"
 }
 
 public enum SequenceError: Error, Equatable, CustomStringConvertible {

@@ -29,23 +29,24 @@ final class StepVisuals {
         stepId = id
         enteredAt = now
         switch id {
-        case StepID.hold: hold()
-        case StepID.swab: swab()
+        case StepID.cream: cream()
+        case StepID.clean: clean()
         case StepID.countdown: countdown()
         case StepID.connect: connect()
+        case StepID.flush: flush()
         case StepID.charge: charge()
         case StepID.release: release()
-        case StepID.seal: seal()
         case SessionMarker.complete: complete()
         default: idle()
         }
     }
 
-    /// Nothing on the arm, lantern dark, cable away.
+    /// Nothing on the access site, lantern dark, cable away.
     private func idle() {
         rig.root.isEnabled = false
         rig.disc.components[OpacityComponent.self]?.opacity = 1
         rig.disc.scale = .one
+        rig.disc.position = .zero
         rig.placeSparkles(phase: 0, visible: false)
         rig.mark.isEnabled = false
         rig.mark.components[OpacityComponent.self]?.opacity = 0
@@ -53,61 +54,66 @@ final class StepVisuals {
         rig.seal.components[OpacityComponent.self]?.opacity = 0
         rig.setDisc(tint: PortRig.portBlue, emissive: 2)
         flow.setExtension(0)
+        flow.setSpark(nil)
         lantern.apply(.dark)
     }
 
-    /// Guide places the charging port on the forearm: soft landing.
-    private func hold() {
+    /// The port glow grows under the skin as the cream works.
+    private func cream() {
         idle()
         rig.root.isEnabled = true
-        rig.disc.scale = SIMD3(repeating: 0.01)
+        rig.disc.components[OpacityComponent.self]?.opacity = 0
+        rig.setDisc(tint: PortRig.portBlue, emissive: 0.2)
     }
 
-    /// Port is cooled and polished: frost shimmer.
-    private func swab() {
+    /// Port polished: frost shimmer.
+    private func clean() {
         rig.root.isEnabled = true
-        rig.disc.scale = .one
+        rig.disc.components[OpacityComponent.self]?.opacity = 1
         rig.placeSparkles(phase: 0, visible: true)
     }
 
-    /// Three pulses of light at the port.
+    /// Three pulses of light at the port. The child holds still here.
     private func countdown() {
         rig.root.isEnabled = true
-        rig.disc.scale = .one
+        rig.disc.components[OpacityComponent.self]?.opacity = 1
         rig.placeSparkles(phase: 0, visible: false)
         rig.setDisc(tint: PortRig.portBlue, emissive: 2)
     }
 
-    /// Cable clicks into the port.
+    /// Cable clicks into the port. The needle moment.
     private func connect() {
         rig.setDisc(tint: PortRig.portBlue, emissive: 3)
         flow.setExtension(0)
     }
 
-    /// Energy flows while the arm is still and the head is on the port.
+    /// The first spark runs up the cable and the lantern wakes.
+    private func flush() {
+        flow.setExtension(1)
+        flow.setSpark(0)
+        lantern.apply(.charging(level: 0))
+    }
+
+    /// The lantern fills on its own time. No one is held here.
     private func charge() {
         flow.setExtension(1)
+        flow.setSpark(nil)
     }
 
-    /// Cable disconnects; lantern fully lit.
+    /// Cable disconnects; lantern fully lit; the mark fades onto the dressing.
     private func release() {
         lantern.apply(.lit)
-    }
-
-    /// Seal placed over the port; charge mark remains on the arm.
-    private func seal() {
-        lantern.apply(.lit)
-        flow.setExtension(0)
+        flow.setSpark(nil)
         rig.mark.isEnabled = true
         rig.seal.isEnabled = true
     }
 
-    /// Port gone, mark stays, lantern stays lit.
+    /// Port gone, mark stays on the dressing, lantern stays lit.
     private func complete() {
         lantern.apply(.lit)
         flow.setExtension(0)
         rig.disc.components[OpacityComponent.self]?.opacity = 0
-        rig.seal.components[OpacityComponent.self]?.opacity = 1
+        rig.seal.components[OpacityComponent.self]?.opacity = 0.85
         rig.mark.components[OpacityComponent.self]?.opacity = 1
     }
 
@@ -119,12 +125,12 @@ final class StepVisuals {
         let t = now - enteredAt
 
         switch stepId {
-        case StepID.hold:
-            let u = Float(min(1, t / config.portLanding))
-            let eased = 1 - (1 - u) * (1 - u)
-            rig.disc.scale = SIMD3(repeating: max(0.01, eased))
-            rig.disc.position.y = (1 - eased) * 0.05
-        case StepID.swab:
+        case StepID.cream:
+            let u = Float(min(1, t / config.creamGlow))
+            let eased = u * u
+            rig.disc.components[OpacityComponent.self]?.opacity = 0.15 + 0.85 * eased
+            rig.setDisc(tint: PortRig.portBlue, emissive: 0.2 + 1.8 * eased)
+        case StepID.clean:
             rig.placeSparkles(phase: Float(t) * 2.5, visible: true)
             let shimmer = 0.5 + 0.5 * sin(Float(t) * 9)
             rig.setDisc(tint: blend(PortRig.portBlue, PortRig.frostWhite, 0.6), emissive: 2 + 2 * shimmer)
@@ -139,12 +145,15 @@ final class StepVisuals {
             }
         case StepID.connect:
             flow.setExtension(Float(min(1, t / config.cableSnap)))
+        case StepID.flush:
+            let u = Float(min(1, t / config.flushSpark))
+            flow.setSpark(u < 1 ? u : nil)
+            if u >= 1 { lantern.apply(.charging(level: max(charge, 0.02))) }
         case StepID.charge:
             lantern.apply(.charging(level: charge))
         case StepID.release:
             flow.setExtension(Float(max(0, 1 - t / config.cableRetract)))
-        case StepID.seal:
-            let u = Float(min(1, t / config.sealFade))
+            let u = Float(min(1, t / config.markFade))
             rig.seal.components[OpacityComponent.self]?.opacity = 0.85 * u
             rig.mark.components[OpacityComponent.self]?.opacity = u
             rig.disc.components[OpacityComponent.self]?.opacity = 1 - u

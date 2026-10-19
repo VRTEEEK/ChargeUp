@@ -5,16 +5,16 @@ import Testing
 @Suite struct SessionRecorderTests {
     @Test func recordsOnlyWhileRecordingAndWritesCSV() throws {
         var r = SessionRecorder()
-        r.record(stepId: "hold", hostTimestamp: 1, armStill: true, headOnPort: true, charge: 0)
+        r.record(stepId: "cream", hostTimestamp: 1, armStill: true, headOnPort: true, charge: 0)
         #expect(r.rows.isEmpty, "nothing before begin")
         r.begin(at: 1_700_000_000)
-        r.record(stepId: "hold", hostTimestamp: 1_700_000_000.1, armStill: false, headOnPort: true, charge: 0)
+        r.record(stepId: "cream", hostTimestamp: 1_700_000_000.1, armStill: false, headOnPort: true, charge: 0)
         r.record(stepId: "charge", hostTimestamp: 1_700_000_003.25, armStill: true, headOnPort: true, charge: 0.5)
         #expect(r.rows.count == 2)
         let csv = r.csv()
         let lines = csv.split(separator: "\n")
         #expect(lines[0] == Substring(SessionRecorder.csvHeader))
-        #expect(lines[1] == "hold,1700000000.100,0,1,0.000")
+        #expect(lines[1] == "cream,1700000000.100,0,1,0.000")
         #expect(lines[2] == "charge,1700000003.250,1,1,0.500")
         #expect(r.fileName(timeZone: TimeZone(identifier: "UTC")!) == "chargeup-session-20231114-221320.csv")
 
@@ -29,7 +29,7 @@ import Testing
     @Test func beginClearsPreviousRows() {
         var r = SessionRecorder()
         r.begin(at: 1)
-        r.record(stepId: "hold", hostTimestamp: 1, armStill: true, headOnPort: true, charge: 0)
+        r.record(stepId: "cream", hostTimestamp: 1, armStill: true, headOnPort: true, charge: 0)
         r.begin(at: 2)
         #expect(r.rows.isEmpty)
     }
@@ -52,6 +52,6 @@ import Testing
         host.stop()
         #expect(ticks >= 3)
         #expect(recorder.rows.count == ticks)
-        #expect(recorder.rows.allSatisfy { $0.stepId == StepID.hold && $0.armStill && $0.headOnPort })
+        #expect(recorder.rows.allSatisfy { $0.stepId == StepID.cream && $0.armStill && $0.headOnPort })
     }
 }

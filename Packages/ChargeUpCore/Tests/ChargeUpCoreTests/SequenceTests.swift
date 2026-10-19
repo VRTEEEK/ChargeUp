@@ -8,14 +8,17 @@ import Testing
         #expect(seq.version == 1)
         #expect(seq.object == "lantern")
         #expect(seq.steps.map(\.id) == [
-            StepID.hold, StepID.swab, StepID.countdown, StepID.connect,
-            StepID.charge, StepID.release, StepID.seal,
+            StepID.cream, StepID.clean, StepID.countdown, StepID.connect,
+            StepID.flush, StepID.charge, StepID.release,
         ])
         #expect(seq.step(id: StepID.countdown)?.advance == .nurseTap(label: "CONNECT"))
         #expect(seq.step(id: StepID.connect)?.advance == .auto(durationMs: 400))
-        #expect(seq.step(id: StepID.hold)?.advance.buttonLabel == Advance.defaultLabel)
-        #expect(seq.step(id: StepID.charge)?.haptic == .ramp)
-        #expect(seq.step(id: StepID.connect)?.haptic == .pulse)
+        #expect(seq.step(id: StepID.charge)?.advance == .nurseTap(label: "NEEDLE OUT"))
+        #expect(seq.step(id: StepID.release)?.advance == .nurseTap(label: "DONE"))
+        #expect(seq.step(id: StepID.cream)?.advance.buttonLabel == Advance.defaultLabel)
+        #expect(seq.step(id: StepID.connect)?.haptic == .ramp, "the ramp runs from the needle moment")
+        #expect(seq.step(id: StepID.charge)?.haptic == Haptic.none, "the infusion has no haptic")
+        #expect(seq.steps.filter { $0.haptic == .ramp }.count == 1)
         #expect(seq.config.rampStartIntensity == 0.2)
         #expect(seq.config.rampEndIntensity == 1.0)
         #expect(seq.config.headOnPortDegrees == 25)
@@ -26,7 +29,7 @@ import Testing
         for step in seq.steps { #expect(!seq.prompt(for: step.id).isEmpty, Comment(rawValue: step.id)) }
         #expect(!seq.prompt(for: SessionMarker.idle).isEmpty)
         #expect(!seq.prompt(for: SessionMarker.complete).isEmpty)
-        #expect(seq.prompt(for: StepID.charge) == "Keep looking at the light, it's filling up.")
+        #expect(seq.prompt(for: StepID.charge).contains("filling"))
         #expect(seq.prompt(for: "nope").isEmpty)
     }
 
@@ -43,11 +46,12 @@ import Testing
         #expect(v.countdownPulseCount == 3)
         #expect(v.countdownPulseMs == 800, "three pulses of light, 800 ms apart")
         #expect(v.cableSnap < v.cableRetract)
+        #expect(v.flushSpark > 0)
     }
 
     @Test func audioConfigAndIds() throws {
         let seq = try ChargeSequence.shipped()
-        #expect(seq.audioIds == ["port_place", "frost", "pulse", "click", "flow_loop", "complete", "seal"])
+        #expect(seq.audioIds == ["port_place", "frost", "pulse", "click", "spark", "flow_loop", "complete"])
         #expect(seq.config.audio.playsAtLantern("flow_loop"))
         #expect(!seq.config.audio.playsAtLantern("click"))
         #expect(seq.config.audio.loops("flow_loop"))
@@ -101,7 +105,7 @@ import Testing
         var steps = json["steps"] as! [[String: Any]]
         steps[1]["id"] = steps[0]["id"]
         json["steps"] = steps
-        #expect(throws: SequenceError.duplicateStepId(StepID.hold)) { try load(json) }
+        #expect(throws: SequenceError.duplicateStepId(StepID.cream)) { try load(json) }
     }
 
     @Test func missingCountdownStepFails() throws {

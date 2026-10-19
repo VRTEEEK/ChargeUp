@@ -8,9 +8,6 @@ import os
 @MainActor
 final class HapticPlayer: ObservableObject {
     private static let logger = Logger(subsystem: "com.vrteek.chargeup", category: "haptic")
-    /// The ramp holds at full intensity until the nurse taps NEEDLE OUT; this
-    /// caps how long it can run if that message never comes.
-    private static let maxRampSeconds: TimeInterval = 30
 
     @Published private(set) var isAvailable = false
     @Published private(set) var isRamping = false
@@ -54,7 +51,8 @@ final class HapticPlayer: ObservableObject {
     }
 
     /// Continuous buzz rising from rampIntensity[0] to rampIntensity[1] over
-    /// rampDurationMs, then holding until `stop()`.
+    /// rampDurationMs, then it ends on its own. It starts at the needle
+    /// moment and is not tied to the step that follows.
     func startRamp(_ config: SequenceConfigValues) {
         guard let engine else { return }
         stop()
@@ -62,11 +60,10 @@ final class HapticPlayer: ObservableObject {
             let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [
                 CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
                 CHHapticEventParameter(parameterID: .hapticSharpness, value: Float(config.sharpness)),
-            ], relativeTime: 0, duration: HapticPlayer.maxRampSeconds)
+            ], relativeTime: 0, duration: config.durationSeconds)
             let curve = CHHapticParameterCurve(parameterID: .hapticIntensityControl, controlPoints: [
                 .init(relativeTime: 0, value: Float(config.startIntensity)),
                 .init(relativeTime: config.durationSeconds, value: Float(config.endIntensity)),
-                .init(relativeTime: HapticPlayer.maxRampSeconds, value: Float(config.endIntensity)),
             ], relativeTime: 0)
             let pattern = try CHHapticPattern(events: [event], parameterCurves: [curve])
             let player = try engine.makeAdvancedPlayer(with: pattern)

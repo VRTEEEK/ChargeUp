@@ -15,6 +15,9 @@ final class EnergyFlow {
 
     let cable: ModelEntity
     let packets: [ModelEntity]
+    /// The single first spark of the flush step, 0 at the port to 1 at the lantern; nil hides it.
+    let spark: ModelEntity
+    private var sparkProgress: Float?
     /// 0 = fully retracted into the lantern, 1 = plugged into the port.
     private(set) var extension_: Float = 0
     private var phase: Float = 0
@@ -43,10 +46,20 @@ final class EnergyFlow {
             list.append(p)
         }
         packets = list
+        var sparkMaterial = packetMaterial
+        sparkMaterial.emissiveIntensity = 10
+        spark = ModelEntity(mesh: .generateSphere(radius: Self.packetRadius * 1.6), materials: [sparkMaterial])
+        spark.name = "spark"
+        spark.isEnabled = false
+    }
+
+    func setSpark(_ progress: Float?) {
+        sparkProgress = progress
     }
 
     func attach(to content: RealityViewContent) {
         content.add(cable)
+        content.add(spark)
         for p in packets { content.add(p) }
     }
 
@@ -61,6 +74,7 @@ final class EnergyFlow {
         let length = simd_length(full)
         guard extension_ > 0.001, length > 0.01 else {
             cable.isEnabled = false
+            spark.isEnabled = false
             for p in packets { p.isEnabled = false }
             return
         }
@@ -70,6 +84,13 @@ final class EnergyFlow {
         cable.position = socket + dir * (visibleLength / 2)
         cable.orientation = simd_quatf(from: SIMD3(0, 1, 0), to: dir)
         cable.scale = SIMD3(1, visibleLength, 1)
+
+        if let sparkProgress {
+            spark.isEnabled = true
+            spark.position = port - dir * (sparkProgress * length)
+        } else {
+            spark.isEnabled = false
+        }
 
         if flowing { phase += speed * dt / length }
         phase = phase.truncatingRemainder(dividingBy: 1)

@@ -48,9 +48,9 @@ import Testing
         #expect(host.peers.first?.role == .nurse)
         #expect(nurse.peers.first?.role == .vision)
 
-        host.send(.stepChanged(stepId: StepID.swab, hostTimestamp: 12.5))
+        host.send(.stepChanged(stepId: StepID.clean, hostTimestamp: 12.5))
         let stepArrived = await waitUntil(Self.messageTimeout) {
-            nurseGot.contains(.stepChanged(stepId: StepID.swab, hostTimestamp: 12.5))
+            nurseGot.contains(.stepChanged(stepId: StepID.clean, hostTimestamp: 12.5))
         }
         #expect(stepArrived)
 
@@ -62,7 +62,7 @@ import Testing
         #expect(sent.count == 1)
         #expect(sent.first?.hostTimestamp == 12.5)
         #expect(host.log.entries.contains { $0.direction == .received && $0.type == "connect" })
-        #expect(host.log.csv().contains("stepChanged,swab,12.500000"))
+        #expect(host.log.csv().contains("stepChanged,clean,12.500000"))
     }
 
     @Test @MainActor func hostAndMirrorRunTheSequenceTogether() async throws {
@@ -87,20 +87,22 @@ import Testing
 
         // Nurse starts the session.
         nurse.tapButton()
-        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.hold })
-        #expect(host.currentStepId == StepID.hold)
+        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.cream })
+        #expect(host.currentStepId == StepID.cream)
 
         // Double tap only advances once: the second request names a stale target.
         nurse.tapButton()
-        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.swab })
+        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.clean })
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.countdown })
         #expect(nurse.buttonLabel == "CONNECT")
 
-        // Connect, then the auto step hands over to charge on the host's clock.
+        // Connect, then the auto step hands over to flush on the host's clock.
+        nurse.tapButton()
+        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.flush })
+        #expect(nurse.lastConnectRoundTripMs != nil)
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.charge })
-        #expect(nurse.lastConnectRoundTripMs != nil)
         #expect(nurse.buttonLabel == "NEEDLE OUT")
 
         // Presence flows host -> nurse at tick rate.
@@ -109,8 +111,6 @@ import Testing
 
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.release })
-        nurse.tapButton()
-        #expect(await waitUntil(Self.messageTimeout) { nurse.currentStepId == StepID.seal })
         #expect(nurse.buttonLabel == "DONE")
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.isComplete })
@@ -157,7 +157,7 @@ import Testing
         #expect(await waitUntil(10) { seen.contains(SessionMarker.complete) })
         let expected = sequence.steps.map(\.id) + [SessionMarker.complete]
         #expect(Array(seen.prefix(expected.count)) == expected, "\(seen)")
-        #expect(await waitUntil(5) { seen.filter { $0 == StepID.hold }.count >= 2 }, "cycles after complete: \(seen)")
+        #expect(await waitUntil(5) { seen.filter { $0 == StepID.cream }.count >= 2 }, "cycles after complete: \(seen)")
         #expect(host.state.phase != .idle || seen.last == SessionMarker.idle)
 
         driver.set(false)
@@ -195,7 +195,7 @@ import Testing
         #expect(await waitUntil(5) { host.knownRoles == [.nurse] && host.missingRoles.isEmpty })
 
         // Nurse takes the session to countdown.
-        for expected in [StepID.hold, StepID.swab, StepID.countdown] {
+        for expected in [StepID.cream, StepID.clean, StepID.countdown] {
             nurse.tapButton()
             try #require(await waitUntil(5) { nurse.currentStepId == expected })
         }
@@ -222,6 +222,6 @@ import Testing
 
         // And it can carry on from there.
         nurse2.tapButton()
-        #expect(await waitUntil(5) { nurse2.currentStepId == StepID.charge })
+        #expect(await waitUntil(5) { nurse2.currentStepId == StepID.flush })
     }
 }

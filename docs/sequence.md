@@ -2,15 +2,17 @@
 
 Derived from `Packages/ChargeUpCore/Resources/sequence.json`. That file is the source of truth; if this table and the JSON disagree, the JSON wins and this file is stale.
 
-| # | id | Nurse sees | Child feels (clinical cue) | Child sees (perceived) | Child does | Haptic phone | Sound at port | Advance |
+| # | id | Nurse sees | Child feels (clinical cue) | Child sees (perceived) | Child does | Haptic phone | Sound | Advance |
 |---|---|---|---|---|---|---|---|---|
-| 1 | `hold` | Nurse holds the arm | Firm grip, warmth | Guide places the charging port on the forearm | Offer the arm | none | `port_place` | nurse tap (Next) |
-| 2 | `swab` | Alcohol swab | Cold, wet, brief | Port is cooled and polished; frost shimmer | Watch the port glow | none | `frost` | nurse tap (Next) |
-| 3 | `countdown` | Pause before needle | Nurse says: three, two, one | Three pulses of light at the port, 800 ms apart | Take a breath | none | `pulse` | nurse tap (**CONNECT**) |
-| 4 | `connect` | Needle contact | Sharp onset | Cable clicks into the port | Look at the port | one pulse | `click` | auto, 400 ms |
-| 5 | `charge` | Injection | Pressure, spreading ache, 3 to 5 s | Energy bar fills; lantern brightens; flow only while arm is still and head is on port | Stay still so the flow continues | ramp 0.2 → 1.0 | `flow_loop` | nurse tap (**NEEDLE OUT**) |
-| 6 | `release` | Needle out | Release | Cable disconnects; lantern fully lit | Exhale | stop | `complete` | nurse tap (Next) |
-| 7 | `seal` | Cotton and plaster | Pressure, adhesive | Seal placed over the port; charge mark remains on the arm | Look at the mark | none | `seal` | nurse tap (**DONE**) |
+| 1 | `cream` | Numbing cream on the port | Cool cream, cling film, a long wait | The port glow grows under the skin | Let it work | none | `port_place` at port | nurse tap (Next) |
+| 2 | `clean` | Skin cleaned | Cold, wet, brief | Port polished; frost shimmer | Watch the port shine | none | `frost` at port | nurse tap (Next) |
+| 3 | `countdown` | Count of three | Nurse says: three, two, one | Three pulses of light at the port, 800 ms apart | Take a breath, hold still | none | `pulse` at port | nurse tap (**CONNECT**) |
+| 4 | `connect` | Port needle in | Sharp push, then pressure | Cable clicks into the port | Look at the port, hold still | ramp 0.2 → 1.0 over rampDurationMs, then stops | `click` at port | auto, 400 ms |
+| 5 | `flush` | Flush and blood draw | Cold in the chest, a strange taste | The first spark runs up the cable and the lantern wakes | Watch the spark | none | `spark` at port | nurse tap (Next) |
+| 6 | `charge` | Infusion | Hours on the pump; free to move, rest or sleep | The lantern fills over time | Come back and look whenever you like | none | `flow_loop` at lantern | nurse tap (**NEEDLE OUT**) |
+| 7 | `release` | Needle out and dressing | Pull, pressure, adhesive | Cable disconnects; lantern fully lit and rises to join the sky; a charge mark fades onto the dressing | Watch it rise | none | `complete` at port | nurse tap (**DONE**) |
+
+Stillness and attention are asked for at steps 3 and 4 only. The reducer's two gates are unchanged: `connect` is honoured only on `countdown`, and the fill lives on `charge`.
 
 ## Config
 
@@ -22,7 +24,8 @@ Derived from `Packages/ChargeUpCore/Resources/sequence.json`. That file is the s
 | `chargeRatePerSecond` | 0.25 | SessionReducer: charge fills at this rate while armStill and headOnPort |
 | `rampIntensity` | [0.2, 1.0] | Haptic role: start and end intensity of the continuous event |
 | `rampSharpness` | 0.3 | Haptic role: sharpness of the continuous event |
-| `rampDurationMs` | 4000 | Haptic role: time to go from start to end intensity (added in M1; the ramp then holds until NEEDLE OUT) |
+| `rampDurationMs` | 4000 | Haptic role: length of the ramp that starts at `connect`; it ends on its own |
+| `visuals.*` | see sequence.json | StepVisuals timings: creamGlowMs, countdownPulseCount/Ms, cableSnapMs, flushSparkMs, cableRetractMs, markFadeMs, flow packets, frost sparkles |
 | `forearm.heldArm` | left | Vision, ForearmAnchor: which hand anchor to follow |
 | `forearm.portOffsetProximalMm` | 60 | ForearmPoseSolver: wrist joint to port, toward the elbow |
 | `forearm.forearmRadiusMm` | 25 | ForearmPoseSolver: bone line to skin |
@@ -37,7 +40,7 @@ Derived from `Packages/ChargeUpCore/Resources/sequence.json`. That file is the s
 
 - **Headset (`vision` role)** hosts the session. It runs the reducer and a 10 Hz tick, broadcasts `stepChanged` on every phase change, `presence` on every tick, and hands a newly joined companion the current step.
 - **Nurse** sends `stepChanged(next step)` as a request, or `connect` on the countdown step, or `reset`. The host only honours a request for the step immediately after the current one, so a double tap cannot skip.
-- **Haptic** reacts only to each step's `haptic` field: `pulse`, `ramp`, `none` (stop).
+- **Haptic** reacts only to each step's `haptic` field: `pulse` taps once, `ramp` runs for `rampDurationMs` and ends on its own, `none` does nothing (so the ramp started at the needle moment is not cut off). Idle and complete stop it.
 - **Parent** mirrors the step list. The prompt line is Milestone 3.
 
 Reserved step ids in `stepChanged` that are not rows: `idle`, `complete`.

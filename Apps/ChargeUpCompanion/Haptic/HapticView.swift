@@ -2,7 +2,10 @@ import SwiftUI
 import ChargeUpCore
 
 /// The phone in the child's free hand. Shows only a connection dot and
-/// reacts to each step's `haptic` field: pulse, ramp, or stop.
+/// reacts to each step's `haptic` field: `pulse` taps once, `ramp` runs the
+/// rising buzz for rampDurationMs and ends by itself, `none` does nothing
+/// so a ramp started at the needle moment is not cut off by the next step.
+/// Reset and the end of the session stop everything.
 struct HapticView: View {
     @ObservedObject var session: CompanionSession
     @StateObject private var player = HapticPlayer()
@@ -38,12 +41,16 @@ struct HapticView: View {
                                           endIntensity: config.rampEndIntensity,
                                           sharpness: config.rampSharpness,
                                           durationSeconds: Double(config.rampDurationMs) / 1000)
-        session.mirror.onStepChanged = { [weak player] _, step in
+        session.mirror.onStepChanged = { [weak player] id, step in
             guard let player else { return }
-            switch step?.haptic ?? .none {
+            guard let step else {
+                player.stop()   // idle or complete
+                return
+            }
+            switch step.haptic {
             case .pulse: player.pulse()
             case .ramp: player.startRamp(values)
-            case .none: player.stop()
+            case .none: break
             }
         }
         // Catch up if we joined mid-ramp.
