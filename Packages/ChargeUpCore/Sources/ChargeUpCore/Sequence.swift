@@ -170,6 +170,23 @@ public struct ForearmConfig: Codable, Equatable, Sendable {
     public var filterMaxStep: TimeInterval { Double(filterMaxStepMs) / 1000 }
 }
 
+/// How the lantern fills during the infusion. Time-based by default: a
+/// real infusion runs for hours, the demo compresses it to demoDurationSec.
+public struct ChargeConfig: Codable, Equatable, Sendable {
+    /// When true, the fill only advances while armStill and headOnPort (the
+    /// original needle-moment rule). Off for the chemotherapy session.
+    public var gatedByPresence: Bool
+    /// Seconds for the fill to go from 0 to 1 while advancing.
+    public var demoDurationSec: Double
+    /// Nice to have: when the head turns to within this angle of the lantern
+    /// during charge, the lantern brightens briefly and shows its fill.
+    public var glanceDegrees: Double
+    /// How long that brightening takes to settle.
+    public var glanceSeconds: Double
+
+    public var ratePerSecond: Double { 1 / demoDurationSec }
+}
+
 /// Timings and counts for the per-step visuals. Each maps to a row's
 /// "perceived" text; nothing here invents a visual.
 public struct VisualsConfig: Codable, Equatable, Sendable {
@@ -241,10 +258,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var visuals: VisualsConfig
     public var audio: AudioConfig
     public var lantern: LanternConfig
+    public var charge: ChargeConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
     public var headOnPortDegrees: Double
-    public var chargeRatePerSecond: Double
     /// Two values: intensity at the start and at the end of the ramp, each 0...1.
     public var rampIntensity: [Double]
     public var rampSharpness: Double
@@ -264,10 +281,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
         audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
+        charge = try c.decode(ChargeConfig.self, forKey: .charge)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
         headOnPortDegrees = try c.decode(Double.self, forKey: .headOnPortDegrees)
-        chargeRatePerSecond = try c.decode(Double.self, forKey: .chargeRatePerSecond)
         rampIntensity = try c.decode([Double].self, forKey: .rampIntensity)
         rampSharpness = try c.decode(Double.self, forKey: .rampSharpness)
         rampDurationMs = try c.decode(Int.self, forKey: .rampDurationMs)
@@ -282,10 +299,13 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .rehearsalIntervalMs, in: c, debugDescription: "rehearsalIntervalMs must be > 0")
         }
-        guard rampDurationMs > 0, chargeRatePerSecond > 0 else {
+        guard rampDurationMs > 0 else {
             throw DecodingError.dataCorruptedError(
-                forKey: .rampDurationMs, in: c,
-                debugDescription: "rampDurationMs and chargeRatePerSecond must be > 0")
+                forKey: .rampDurationMs, in: c, debugDescription: "rampDurationMs must be > 0")
+        }
+        guard charge.demoDurationSec > 0, charge.glanceDegrees > 0, charge.glanceSeconds > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
               visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,

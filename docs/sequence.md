@@ -18,10 +18,12 @@ Stillness and attention are asked for at steps 3 and 4 only. The reducer's two g
 
 | Key | Value | Used by |
 |---|---|---|
-| `stillnessThresholdMps` | 0.05 | Vision, StillnessMonitor (M2) |
+| `stillnessThresholdMps` | 0.05 | Vision, StillnessMonitor (M2); matters at the needle moment |
 | `stillnessWindowMs` | 300 | Vision, StillnessMonitor (M2) |
 | `headOnPortDegrees` | 25 | Vision, AttentionProxy (M2) |
-| `chargeRatePerSecond` | 0.25 | SessionReducer: charge fills at this rate while armStill and headOnPort |
+| `charge.gatedByPresence` | false | SessionReducer: when true the fill only advances while armStill and headOnPort (the old rule) |
+| `charge.demoDurationSec` | 90 | SessionReducer: seconds for the fill to go 0 to 1; a real infusion is hours, the demo compresses it |
+| `charge.glanceDegrees`, `charge.glanceSeconds` | 20, 2.5 | Vision: a head turn toward the lantern during charge brightens it briefly, then it settles |
 | `rampIntensity` | [0.2, 1.0] | Haptic role: start and end intensity of the continuous event |
 | `rampSharpness` | 0.3 | Haptic role: sharpness of the continuous event |
 | `rampDurationMs` | 4000 | Haptic role: length of the ramp that starts at `connect`; it ends on its own |

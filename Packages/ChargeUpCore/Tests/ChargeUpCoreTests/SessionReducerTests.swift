@@ -111,26 +111,46 @@ import Testing
         }
     }
 
-    @Test func chargeAccruesOnlyWhileCooperating() {
+    @Test func chargeIsTimeBasedByDefault() {
+        #expect(!seq.config.charge.gatedByPresence)
+        #expect(seq.config.charge.demoDurationSec == 90)
         var s = reduce(SessionState(), .start(at: 0))
         s.phase = .step(seq.index(of: StepID.charge)!)
         s.enteredAt = 0
         s.lastTickAt = 0
+        // No presence at all: still fills.
+        s = reduce(s, .tick(at: 9))
+        #expect(abs(s.charge - 0.1) < 1e-9, "9 s of a 90 s demo infusion is 10 %")
+        s = reduce(s, .presence(armStill: false, headOnPort: false))
+        s = reduce(s, .tick(at: 45))
+        #expect(abs(s.charge - 0.5) < 1e-9, "moving and looking away do not pause it")
+        s = reduce(s, .tick(at: 500))
+        #expect(s.charge == 1)
+        #expect(stepId(s) == StepID.charge, "charge step waits for the nurse")
+        #expect(s.isCharging(in: seq))
+    }
+
+    @Test func chargeCanStillBeGatedByPresenceFromConfig() throws {
+        var gated = seq
+        gated.config.charge.gatedByPresence = true
+        func reduce(_ s: SessionState, _ e: SessionEvent) -> SessionState { SessionReducer.reduce(s, e, sequence: gated) }
+        var s = reduce(SessionState(), .start(at: 0))
+        s.phase = .step(gated.index(of: StepID.charge)!)
+        s.enteredAt = 0
+        s.lastTickAt = 0
         s = reduce(s, .tick(at: 1))
         #expect(s.charge == 0)
+        #expect(!s.isCharging(in: gated))
         s = reduce(s, .presence(armStill: true, headOnPort: false))
         s = reduce(s, .tick(at: 2))
         #expect(s.charge == 0)
         s = reduce(s, .presence(armStill: true, headOnPort: true))
         s = reduce(s, .tick(at: 3))
-        #expect(abs(s.charge - seq.config.chargeRatePerSecond) < 1e-9)
+        #expect(abs(s.charge - gated.config.charge.ratePerSecond) < 1e-9)
+        #expect(s.isCharging(in: gated))
         s = reduce(s, .presence(armStill: false, headOnPort: true))
         s = reduce(s, .tick(at: 4))
-        #expect(abs(s.charge - seq.config.chargeRatePerSecond) < 1e-9)
-        s = reduce(s, .presence(armStill: true, headOnPort: true))
-        s = reduce(s, .tick(at: 100))
-        #expect(s.charge == 1)
-        #expect(stepId(s) == StepID.charge, "charge step waits for the nurse")
+        #expect(abs(s.charge - gated.config.charge.ratePerSecond) < 1e-9)
     }
 
     @Test func chargeDoesNotAccrueOutsideChargeStep() {
@@ -140,11 +160,11 @@ import Testing
         #expect(s.charge == 0)
     }
 
-    @Test func isChargingReflectsStepAndPresence() {
+    @Test func isChargingIsFalseOutsideTheChargeStep() {
         var s = reduce(SessionState(), .start(at: 0))
-        s.phase = .step(seq.index(of: StepID.charge)!)
-        #expect(!s.isCharging(in: seq))
         s = reduce(s, .presence(armStill: true, headOnPort: true))
+        #expect(!s.isCharging(in: seq))
+        s.phase = .step(seq.index(of: StepID.charge)!)
         #expect(s.isCharging(in: seq))
     }
 }

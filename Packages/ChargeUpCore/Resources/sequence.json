@@ -83,10 +83,15 @@
       "simulatedForwardM": 0.7,
       "simulatedBelowHeadM": 0.12
     },
+    "charge": {
+      "gatedByPresence": false,
+      "demoDurationSec": 90,
+      "glanceDegrees": 20,
+      "glanceSeconds": 2.5
+    },
     "stillnessThresholdMps": 0.05,
     "stillnessWindowMs": 300,
     "headOnPortDegrees": 25,
-    "chargeRatePerSecond": 0.25,
     "rampIntensity": [0.2, 1.0],
     "rampSharpness": 0.3,
     "rampDurationMs": 4000,

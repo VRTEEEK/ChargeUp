@@ -71,7 +71,7 @@ import Testing
     @Test func missingConfigKeyFails() throws {
         var json = try shippedJSON()
         var config = json["config"] as! [String: Any]
-        config.removeValue(forKey: "chargeRatePerSecond")
+        config.removeValue(forKey: "headOnPortDegrees")
         json["config"] = config
         #expect(throws: DecodingError.self) { try load(json) }
     }

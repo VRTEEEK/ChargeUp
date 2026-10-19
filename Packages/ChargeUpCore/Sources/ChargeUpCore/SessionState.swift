@@ -33,9 +33,11 @@ public struct SessionState: Equatable, Sendable, Codable {
         return sequence.steps[i]
     }
 
-    /// True while the charge step is active and the child is doing their part.
+    /// True while the fill is advancing: the charge step is active and, only
+    /// if config.charge.gatedByPresence, the child is still and looking.
     public func isCharging(in sequence: ChargeSequence) -> Bool {
-        currentStep(in: sequence)?.id == StepID.charge && armStill && headOnPort
+        guard currentStep(in: sequence)?.id == StepID.charge else { return false }
+        return !sequence.config.charge.gatedByPresence || (armStill && headOnPort)
     }
 }
 
@@ -90,8 +92,8 @@ public enum SessionReducer {
             guard let step = s.currentStep(in: sequence), let i = s.currentStepIndex() else { return s }
             let dt = max(0, now - s.lastTickAt)
             s.lastTickAt = now
-            if step.id == StepID.charge, s.armStill, s.headOnPort {
-                s.charge = min(1, s.charge + sequence.config.chargeRatePerSecond * dt)
+            if s.isCharging(in: sequence) {
+                s.charge = min(1, s.charge + sequence.config.charge.ratePerSecond * dt)
             }
             if let ms = step.advance.autoDurationMs, elapsedMs(from: s.enteredAt, to: now) >= ms {
                 return enter(step: i + 1, into: s, at: now, sequence: sequence)

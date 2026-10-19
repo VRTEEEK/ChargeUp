@@ -27,6 +27,9 @@ final class ChargeObjectEntity {
     private let core: ModelEntity
     private let fill: ModelEntity
     private(set) var state: State = .dark
+    /// 0...1 extra brightness while the child glances at the lantern during
+    /// the infusion. Set by SceneDirector; decays on its own.
+    var glance: Float = 0
 
     /// Where the cable leaves the lantern, in the lantern's local frame.
     var cableSocket: SIMD3<Float> { SIMD3(0, Self.capHeight / 2, Self.bodyRadius) }
@@ -84,7 +87,11 @@ final class ChargeObjectEntity {
             fill.isEnabled = false
         case .charging(let level):
             let l = max(0, min(1, level))
-            core.model?.materials = [Self.glowMaterial(intensity: 0.2 + 3.0 * l)]
+            let g = max(0, min(1, glance))
+            // Resting during the infusion the lantern is calm; a glance
+            // brightens the core and shows the fill clearly, then settles.
+            core.model?.materials = [Self.glowMaterial(intensity: 0.2 + 1.5 * l + 3.0 * g)]
+            fill.model?.materials = [Self.glowMaterial(intensity: 0.3 + 1.2 * g)]
             setFill(l)
         case .lit:
             core.model?.materials = [Self.glowMaterial(intensity: 4.0)]
