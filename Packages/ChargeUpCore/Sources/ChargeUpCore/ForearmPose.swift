@@ -265,3 +265,27 @@ public enum LanternPlacement {
         return m
     }
 }
+
+
+/// Pure geometry for the chest port: image-anchor transform in, port pose out.
+public enum MarkerPoseSolver {
+    /// - Parameter marker: origin-from-anchor transform of the tracked image; its
+    ///   translation is the marker centre and `config.markerNormalAxis` points at the viewer.
+    /// The port frame matches the forearm one: +Y out of the skin, +X along the marker's width.
+    public static func solve(marker: simd_float4x4, config: ChestPortConfig)
+        -> (position: SIMD3<Float>, orientation: simd_quatf) {
+        let centre = ForearmPoseSolver.translation(of: marker)
+        let normal = ForearmPoseSolver.axis(config.markerNormalAxis, of: marker)
+        var x = ForearmPoseSolver.axis(SignedAxis(axis: .x, sign: 1), of: marker)
+        x -= normal * simd_dot(x, normal)
+        if simd_length(x) < 1e-4 { x = SIMD3<Float>(1, 0, 0) - normal * normal.x }
+        x = simd_normalize(x)
+        let z = simd_normalize(simd_cross(x, normal))
+        let o = config.portOffset
+        // Offset is in the marker frame: width (x), normal (y), height (z = x × normal,
+        // which points toward the marker's bottom edge when the marker faces the viewer).
+        let position = centre + x * o.x + normal * o.y + z * o.z
+        let rotation = simd_float3x3(columns: (x, normal, z))
+        return (position, simd_quatf(rotation))
+    }
+}

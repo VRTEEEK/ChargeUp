@@ -182,3 +182,38 @@ import simd
         #expect(simd_length(facing - SIMD3(-1, 0, 0)) < 1e-4, "+Z points back at the head")
     }
 }
+
+
+@Suite struct MarkerPoseTests {
+    let config = try! ChargeSequence.shipped().config
+
+    @Test func defaultsToTheArm() {
+        #expect(config.accessSite == .arm)
+        #expect(config.chestPort.markerSizeMm == 50)
+        #expect(config.chestPort.markerImage == "port-marker")
+    }
+
+    @Test func portSitsAtTheOffsetAlongTheMarkerNormal() {
+        var m = matrix_identity_float4x4
+        m.columns.3 = SIMD4(0.1, 1.2, -0.4, 1)
+        let pose = MarkerPoseSolver.solve(marker: m, config: config.chestPort)
+        let expected = SIMD3<Float>(0.1, 1.2, -0.4) + config.chestPort.portOffset
+        #expect(simd_length(pose.position - expected) < 1e-5)
+        #expect(simd_length(pose.orientation.act(SIMD3<Float>(0, 1, 0)) - SIMD3(0, 1, 0)) < 1e-5, "+Y is the marker normal")
+    }
+
+    @Test func offsetFollowsATiltedMarker() {
+        var cfg = config.chestPort
+        cfg.portOffsetFromMarkerMm = [0, 0, 60]
+        // Marker standing upright on a chest, facing the viewer at +Z: its normal (+Y local) maps to world +Z.
+        let tilt = simd_quatf(angle: .pi / 2, axis: SIMD3(1, 0, 0))
+        var m = simd_float4x4(tilt)
+        m.columns.3 = SIMD4(0, 1.3, -0.3, 1)
+        let pose = MarkerPoseSolver.solve(marker: m, config: cfg)
+        let normal = pose.orientation.act(SIMD3<Float>(0, 1, 0))
+        #expect(simd_length(normal - SIMD3(0, 0, 1)) < 1e-4, "normal \(normal)")
+        // 60 mm along the marker's height axis (x × normal), which points down the marker: world -Y.
+        #expect(abs(pose.position.y - (1.3 - 0.06)) < 1e-4, "\(pose.position)")
+        #expect(abs(pose.position.z + 0.3) < 1e-4)
+    }
+}

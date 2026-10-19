@@ -66,6 +66,14 @@
                    "ar": "اكتمل الشحن. هذا الفانوس لك الآن." }
   },
   "config": {
+    "accessSite": "arm",
+    "chestPort": {
+      "markerImage": "port-marker",
+      "markerSizeMm": 50,
+      "markerNormalAxis": "+y",
+      "portOffsetFromMarkerMm": [0, 3, 0],
+      "plateSizeMm": [120, 90]
+    },
     "visuals": {
       "creamGlowMs": 4000,
       "countdownPulseCount": 3,

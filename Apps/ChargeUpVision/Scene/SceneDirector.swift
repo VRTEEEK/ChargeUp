@@ -27,6 +27,9 @@ final class SceneDirector {
         let config = controller.sequence.config
         sounds = SoundBank(config: config.audio)
         rig = PortRig(sparkleCount: config.visuals.frostSparkleCount)
+        if config.accessSite == .chestPort {
+            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize))
+        }
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
         lantern.root.isEnabled = false

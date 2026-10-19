@@ -203,6 +203,35 @@ public struct ChargeConfig: Codable, Equatable, Sendable {
     public var ratePerSecond: Double { 1 / demoDurationSec }
 }
 
+/// Where the needle goes. `arm` uses the forearm hand-tracking anchor and the
+/// sleeve; `chestPort` uses a printed marker on the port dressing and a plate.
+public enum AccessSite: String, Codable, Equatable, Sendable {
+    case arm, chestPort
+}
+
+/// The chest port: a high-contrast marker stuck to the dressing, tracked
+/// with ARKit image tracking, and an offset from the marker centre to the
+/// port itself. Untested on a device.
+public struct ChestPortConfig: Codable, Equatable, Sendable {
+    /// Bundle image name (PNG) that matches docs/port-marker.pdf.
+    public var markerImage: String
+    /// Printed side length. The PDF is laid out to this size at 100 %.
+    public var markerSizeMm: Double
+    /// Which local axis of the image anchor points out of the marker toward the viewer.
+    public var markerNormalAxis: SignedAxis
+    /// From marker centre to the port, in the marker's own frame (x along the
+    /// marker's width, y along its normal, z along its height), millimetres.
+    public var portOffsetFromMarkerMm: [Double]
+    /// The soft-edged plate drawn over the dressing area, width and height.
+    public var plateSizeMm: [Double]
+
+    public var markerSize: Float { Float(markerSizeMm / 1000) }
+    public var portOffset: SIMD3<Float> {
+        SIMD3(Float(portOffsetFromMarkerMm[0]), Float(portOffsetFromMarkerMm[1]), Float(portOffsetFromMarkerMm[2])) / 1000
+    }
+    public var plateSize: SIMD2<Float> { SIMD2(Float(plateSizeMm[0]), Float(plateSizeMm[1])) / 1000 }
+}
+
 /// Timings and counts for the per-step visuals. Each maps to a row's
 /// "perceived" text; nothing here invents a visual.
 public struct VisualsConfig: Codable, Equatable, Sendable {
@@ -271,6 +300,8 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
+    public var accessSite: AccessSite
+    public var chestPort: ChestPortConfig
     public var visuals: VisualsConfig
     public var audio: AudioConfig
     public var lantern: LanternConfig
@@ -295,6 +326,8 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
+        chestPort = try c.decode(ChestPortConfig.self, forKey: .chestPort)
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
         audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
@@ -328,6 +361,11 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard charge.demoDurationSec > 0, charge.glanceDegrees > 0, charge.glanceSeconds > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
+        }
+        guard chestPort.markerSizeMm > 0, chestPort.portOffsetFromMarkerMm.count == 3,
+              chestPort.plateSizeMm.count == 2, !chestPort.markerImage.isEmpty else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .chestPort, in: c, debugDescription: "chestPort config values out of range")
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
               visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,

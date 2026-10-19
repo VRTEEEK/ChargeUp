@@ -42,12 +42,24 @@ final class SessionController: ObservableObject {
         host = SessionHost(sequence: sequence)
         debugControl = DebugFileControl(host: host)
         let forearm = sequence.config.forearm
-        if forearm.simulatedForearm && !HandTrackingProvider.isSupported {
-            portSource = SimulatedForearm(config: forearm.simulatedPath)
-            isSimulatedForearm = true
-        } else {
-            portSource = ForearmAnchor(config: forearm)
-            isSimulatedForearm = false
+        switch sequence.config.accessSite {
+        case .arm:
+            if forearm.simulatedForearm && !HandTrackingProvider.isSupported {
+                portSource = SimulatedForearm(config: forearm.simulatedPath)
+                isSimulatedForearm = true
+            } else {
+                portSource = ForearmAnchor(config: forearm)
+                isSimulatedForearm = false
+            }
+        case .chestPort:
+            // Compile-only path; never the default. Same simulated fallback.
+            if forearm.simulatedForearm && !ImageTrackingProvider.isSupported {
+                portSource = SimulatedForearm(config: forearm.simulatedPath)
+                isSimulatedForearm = true
+            } else {
+                portSource = MarkerPortPoseSource(config: sequence.config.chestPort, smoothing: forearm)
+                isSimulatedForearm = false
+            }
         }
         loadSky()
         host.onTick = { [weak self] state, now in self?.recordTick(state, at: now) }
