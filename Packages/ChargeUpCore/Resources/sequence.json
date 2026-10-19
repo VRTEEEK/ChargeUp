@@ -68,7 +68,8 @@
   "config": {
     "accessSite": "arm",
     "assetOverrides": {
-      "port_ring": { "glassMask": false }
+      "port_ring": { "glassMask": false },
+      "port_plate": { "glassMask": false }
     },
     "chestPort": {
       "markerImage": "port-marker",

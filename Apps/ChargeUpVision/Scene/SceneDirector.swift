@@ -32,7 +32,8 @@ final class SceneDirector {
         rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets,
                       ringGlassMask: controller.sequence.assetOverride(AssetSlot.portRing.rawValue).glassMask)
         if config.accessSite == .chestPort {
-            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize, assets: assets))
+            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize, assets: assets,
+                                                       glassMask: controller.sequence.assetOverride(AssetSlot.portPlate.rawValue).glassMask))
         }
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)

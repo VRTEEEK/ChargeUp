@@ -33,7 +33,7 @@ enum AssetSlot: String, CaseIterable {
 /// says so.
 @MainActor
 final class AssetCatalog {
-    private static let logger = Logger(subsystem: "com.vrteek.chargeup", category: "assets")
+    static let logger = Logger(subsystem: "com.vrteek.chargeup", category: "assets")
     static let glassMaterialName = "Glass"
     static let glassMaterialPath = "/Root/LanternGlass"
     static let glassMaterialFile = "Materials/LanternGlass.usda"
@@ -101,7 +101,26 @@ final class AssetCatalog {
         if let glass { replaced = Self.applyGlass(glass, to: copy) }
         let bounds = copy.visualBounds(relativeTo: nil)
         Self.logger.info("model \(slot.rawValue, privacy: .public): materials \(found.joined(separator: ", "), privacy: .public); Glass replaced on \(replaced) model component(s); bounds min \(bounds.min.description, privacy: .public) max \(bounds.max.description, privacy: .public)")
+        if let glass = Self.glassBounds(in: copy) {
+            Self.logger.info("model \(slot.rawValue, privacy: .public): Glass mesh bounds min \(glass.min.description, privacy: .public) max \(glass.max.description, privacy: .public) centre \(glass.center.description, privacy: .public) (file frame, metres)")
+        }
         return copy
+    }
+
+    /// Bounds of every mesh carrying a material named `Glass` (or the shader
+    /// that replaced it), in the model's own frame. Nil if there is none.
+    static func glassBounds(in entity: Entity, root: Entity? = nil) -> BoundingBox? {
+        let root = root ?? entity
+        var result: BoundingBox?
+        if let model = entity.components[ModelComponent.self],
+           model.materials.contains(where: { $0.name == glassMaterialName || $0 is ShaderGraphMaterial }) {
+            let b = entity.visualBounds(relativeTo: root)
+            result = result.map { $0.union(b) } ?? b
+        }
+        for child in entity.children {
+            if let b = glassBounds(in: child, root: root) { result = result.map { $0.union(b) } ?? b }
+        }
+        return result
     }
 
     /// "entity/material" for every material in the tree, for the operator log.
