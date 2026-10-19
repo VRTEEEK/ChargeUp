@@ -8,8 +8,8 @@ Units: metres, Y up, origin as described per slot. Export USDZ from Reality Comp
 
 | File name | Format | Scale and origin | Material names the app looks for | Placeholder today |
 |---|---|---|---|---|
-| `lantern_hero.usdz` | USDZ | About 0.16 m tall, 0.10 m wide; origin at the centre of the body; +Y up; the cable socket is at (0, +0.09, +0.05) local (front, just under the cap) | `Glass` (receives the LanternGlass shader; its `fill` drives the rising light), anything else untouched | Glass cylinder with frame, core and fill column |
-| `lantern_round.usdz`, `lantern_tall.usdz`, `lantern_square.usdz` | USDZ | Same as hero. The sky picks a variant from a session record's `variant` field; records that say `lantern` cycle through the three | `Glass` as above | Same as hero, scaled by `config.sky.smallScale` |
+| `lantern_hero.usdz` | USDZ | Any height in metres, +Y up (the delivered hero is 0.25 m tall, 0.12 m wide, 18k triangles). Origin anywhere on the vertical axis: the app centres the model's visual bounds on the lantern position, so base-origin and centre-origin files both sit where the placeholder sat. The cable socket is derived from the bounds (36 % of the height up, at the front) | `Glass` (receives the LanternGlass shader; its `fill` drives the rising light; its own base-colour texture is not used), `Brass` or anything else untouched | Glass cylinder with frame, core and fill column |
+| `lantern_round.usdz`, `lantern_tall.usdz`, `lantern_square.usdz` | USDZ | Same as hero (currently copies of the hero file until distinct variants arrive). The sky picks a variant from a session record's `variant` field; records that say `lantern` cycle through the three | `Glass` as above | Same as hero, scaled by `config.sky.smallScale` |
 | `port_ring.usdz` | USDZ | Fits inside a 0.04 m disc; origin at the ring centre on the skin plane; +Y out of the skin; +X toward the hand (arm) or along the marker width (chest) | Any material named `Glow` gets its emissive driven by the step (cream glow, countdown pulses); others untouched | Flat blue emissive disc |
 | `port_plate.usdz` | USDZ | Chest only. About 0.12 × 0.09 m, 3 mm thick; origin at its centre on the skin plane; +Y out of the skin | none | Soft-edged rounded box |
 | `plug.usdz` | USDZ | The cable end that sits in the port. Origin where it meets the port; +Y points away from the skin along the cable | none | A short bright cylinder at the port end of the cable |
@@ -35,7 +35,9 @@ The ShaderGraph uses only nodes RealityKit accepts (`ND_texcoord_vector2`, `ND_s
 | `glowColor`, `glowIntensity` | color, float | The light. |
 | `glassColor`, `glassOpacity` | color, float | The glass when dark. |
 
-At load, every material named `Glass` in a lantern USDZ is replaced by an instance of this material; the app then sets `fill` as the session charges (0 dark, 1 lit; the sky uses the fill the session reached). Name the glass material exactly `Glass` in the DCC tool; the name survives USDZ export.
+At load, every material named `Glass` in a lantern USDZ is replaced by an instance of this material (the loader walks every model component and compares `Material.name`; entity names and subsets are ignored). The app then sets `fill` as the session charges (0 dark, 1 lit; the sky uses the fill the session reached) and `glowIntensity` from `config.lantern.glowDark`, `glowCharging` (+ `glowGlance` while the child looks at it), `glowLit`. Name the glass material exactly `Glass` in the DCC tool; the name survives USDZ export (verified with the delivered hero: materials `Brass` and `Glass`, Glass replaced on one component).
+
+Known limit: the shader's glass is a flat `glassColor` at `glassOpacity` 0.3, so a textured glass (the hero's amber) loses its texture once replaced, and the glow is attenuated by the low opacity. Both are material defaults in `LanternGlass.usda`, not config; changing them is a shader edit.
 
 ## Where the names live in code
 

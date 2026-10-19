@@ -26,6 +26,8 @@ final class SceneDirector {
         self.controller = controller
         let config = controller.sequence.config
         let assets = controller.assets
+        ChargeObjectEntity.glowLevels = (dark: Float(config.lantern.glowDark), charging: Float(config.lantern.glowCharging),
+                                   glance: Float(config.lantern.glowGlance), lit: Float(config.lantern.glowLit))
         sounds = SoundBank(config: config.audio)
         rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets)
         if config.accessSite == .chestPort {

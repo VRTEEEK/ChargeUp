@@ -291,6 +291,13 @@ public struct LanternConfig: Codable, Equatable, Sendable {
     /// active, so the lantern sits inside the simulator's fixed camera frame.
     public var simulatedForwardM: Double
     public var simulatedBelowHeadM: Double
+    /// Emissive intensity of a designed lantern's Glass shader (glowIntensity)
+    /// in each state; glowGlance is added while the child looks at it during
+    /// the infusion. The procedural placeholder has its own fixed values.
+    public var glowDark: Double
+    public var glowCharging: Double
+    public var glowGlance: Double
+    public var glowLit: Double
 
     public var forward: Float { Float(forwardM) }
     public var belowHead: Float { Float(belowHeadM) }
@@ -353,6 +360,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard rampDurationMs > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c, debugDescription: "rampDurationMs must be > 0")
+        }
+        guard lantern.glowDark >= 0, lantern.glowCharging >= 0, lantern.glowGlance >= 0, lantern.glowLit >= 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .lantern, in: c, debugDescription: "lantern glow values must be >= 0")
         }
         guard sky.seededSessions >= 0, sky.riseSeconds > 0, sky.smallScale > 0 else {
             throw DecodingError.dataCorruptedError(

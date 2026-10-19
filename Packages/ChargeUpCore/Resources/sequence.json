@@ -98,7 +98,11 @@
       "fallbackHeadHeightM": 1.6,
       "headPoseWaitMs": 1500,
       "simulatedForwardM": 0.7,
-      "simulatedBelowHeadM": 0.12
+      "simulatedBelowHeadM": 0.12,
+      "glowDark": 0.3,
+      "glowCharging": 6.0,
+      "glowGlance": 5.0,
+      "glowLit": 9.0
     },
     "sky": {
       "seededSessions": 6,

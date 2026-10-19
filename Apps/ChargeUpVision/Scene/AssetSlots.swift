@@ -95,8 +95,22 @@ final class AssetCatalog {
     func model(_ slot: AssetSlot) -> Entity? {
         guard let prototype = models[slot] else { return nil }
         let copy = prototype.clone(recursive: true)
-        if let glass { Self.applyGlass(glass, to: copy) }
+        let found = Self.materialNames(in: copy)
+        var replaced = 0
+        if let glass { replaced = Self.applyGlass(glass, to: copy) }
+        let bounds = copy.visualBounds(relativeTo: nil)
+        Self.logger.info("model \(slot.rawValue, privacy: .public): materials \(found.joined(separator: ", "), privacy: .public); Glass replaced on \(replaced) model component(s); bounds min \(bounds.min.description, privacy: .public) max \(bounds.max.description, privacy: .public)")
         return copy
+    }
+
+    /// "entity/material" for every material in the tree, for the operator log.
+    static func materialNames(in entity: Entity) -> [String] {
+        var names: [String] = []
+        if let model = entity.components[ModelComponent.self] {
+            for m in model.materials { names.append("\(entity.name)/\(m.name ?? "unnamed")") }
+        }
+        for child in entity.children { names += materialNames(in: child) }
+        return names
     }
 
     func image(_ slot: AssetSlot) -> CGImage? { images[slot] }
@@ -109,8 +123,11 @@ final class AssetCatalog {
         return UIImage(data: data)?.cgImage
     }
 
-    /// Replace materials named `Glass` throughout an entity tree.
-    static func applyGlass(_ glass: ShaderGraphMaterial, to entity: Entity) {
+    /// Replace materials named `Glass` throughout an entity tree. Returns how
+    /// many model components had a Glass material replaced.
+    @discardableResult
+    static func applyGlass(_ glass: ShaderGraphMaterial, to entity: Entity) -> Int {
+        var count = 0
         if var model = entity.components[ModelComponent.self] {
             var changed = false
             model.materials = model.materials.map { material in
@@ -120,9 +137,13 @@ final class AssetCatalog {
                 }
                 return material
             }
-            if changed { entity.components.set(model) }
+            if changed {
+                entity.components.set(model)
+                count += 1
+            }
         }
-        for child in entity.children { applyGlass(glass, to: child) }
+        for child in entity.children { count += applyGlass(glass, to: child) }
+        return count
     }
 
     /// Set a float parameter on every ShaderGraph material in the tree that has it.

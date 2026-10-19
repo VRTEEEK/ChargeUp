@@ -25,12 +25,18 @@ final class ChargeObjectEntity {
     private static let glass = UIColor(red: 0.85, green: 0.92, blue: 1.0, alpha: 0.22)
     private static let frame = UIColor(red: 0.18, green: 0.16, blue: 0.14, alpha: 1)
 
+    /// Emissive levels for designed lanterns, from config.lantern. Set once by
+    /// SceneDirector before any lantern is built.
+    nonisolated(unsafe) static var glowLevels = (dark: Float(0.3), charging: Float(6), glance: Float(5), lit: Float(9))
+
     let root = Entity()
     /// Everything visible hangs off `body`, so the lantern can rise while
     /// `root` stays where the sky cluster is anchored.
     let body = Entity()
     /// The designed model, if the slot had a file. Nil means procedural.
     private let model: Entity?
+    /// The designed model's bounds in its own frame, before centring.
+    private var modelBounds: BoundingBox?
     private let core: ModelEntity
     private let fill: ModelEntity
     private(set) var state: State = .dark
@@ -45,8 +51,15 @@ final class ChargeObjectEntity {
         apply(state)
     }
 
-    /// Where the cable leaves the lantern, in the lantern's local frame.
-    var cableSocket: SIMD3<Float> { body.convert(position: SIMD3(0, Self.capHeight / 2, Self.bodyRadius), to: root) }
+    /// Where the cable leaves the lantern, in the lantern's local frame: just
+    /// under the cap at the front. From the model's bounds when designed.
+    var cableSocket: SIMD3<Float> {
+        if let b = modelBounds {
+            let h = b.max.y - b.min.y
+            return body.convert(position: SIMD3(0, h * 0.36, (b.max.z - b.min.z) * 0.5), to: root)
+        }
+        return body.convert(position: SIMD3(0, Self.capHeight / 2, Self.bodyRadius), to: root)
+    }
 
     /// - Parameter model: a clone from `AssetCatalog.model(.lanternHero)` or a
     ///   variant, already carrying the Glass shader; nil for the placeholder.
@@ -97,8 +110,13 @@ final class ChargeObjectEntity {
 
         if let model {
             // Designed lantern: the primitives stay built but hidden, so the
-            // placeholder is one flag away if the file is removed.
+            // placeholder is one flag away if the file is removed. The model's
+            // visual bounds are centred on the body origin, so a file whose
+            // origin is at its base sits where the placeholder did.
             for child in body.children where child !== model { child.isEnabled = false }
+            let bounds = model.visualBounds(relativeTo: nil)
+            model.position = -bounds.center
+            modelBounds = bounds
             body.addChild(model)
         }
 
@@ -115,10 +133,11 @@ final class ChargeObjectEntity {
     func apply(_ newState: State) {
         state = newState
         if model != nil {
+            let g = Self.glowLevels
             switch newState {
-            case .dark: applyToModel(fill: 0, glow: 0.2)
-            case .charging(let level): applyToModel(fill: max(0, min(1, level)), glow: (1.5 + 3.0 * max(0, min(1, glance))) * brightness)
-            case .lit: applyToModel(fill: 1, glow: 3.0 * brightness)
+            case .dark: applyToModel(fill: 0, glow: g.dark)
+            case .charging(let level): applyToModel(fill: max(0, min(1, level)), glow: (g.charging + g.glance * max(0, min(1, glance))) * brightness)
+            case .lit: applyToModel(fill: 1, glow: g.lit * brightness)
             }
             return
         }
