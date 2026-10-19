@@ -29,7 +29,8 @@ final class SceneDirector {
         ChargeObjectEntity.glowLevels = (dark: Float(config.lantern.glowDark), charging: Float(config.lantern.glowCharging),
                                    glance: Float(config.lantern.glowGlance), lit: Float(config.lantern.glowLit))
         sounds = SoundBank(config: config.audio)
-        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets)
+        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets,
+                      ringGlassMask: controller.sequence.assetOverride(AssetSlot.portRing.rawValue).glassMask)
         if config.accessSite == .chestPort {
             rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize, assets: assets))
         }

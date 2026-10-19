@@ -28,8 +28,11 @@ final class PortRig {
     let seal: ModelEntity
     private let ringModel: Entity?
     private let markModel: Entity?
+    /// False holds the ring's Glass fill at 1 (constant emissive, no mask).
+    private let ringGlassMask: Bool
 
-    init(sparkleCount: Int, assets: AssetCatalog? = nil) {
+    init(sparkleCount: Int, assets: AssetCatalog? = nil, ringGlassMask: Bool = true) {
+        self.ringGlassMask = ringGlassMask
         root.name = "portRoot"
         root.components.set(OpacityComponent(opacity: 1))
 
@@ -40,8 +43,11 @@ final class PortRig {
         root.addChild(disc)
         ringModel = assets?.model(.portRing)
         if let ringModel {
+            // The ring's origin is its base; the rig root is the skin plane, so
+            // it sits on the skin where the placeholder disc did.
             disc.components.remove(ModelComponent.self)
             disc.addChild(ringModel)
+            AssetCatalog.setParameter(AssetCatalog.fillParameter, ringGlassMask ? 0 : 1, in: ringModel)
         }
 
         var list: [ModelEntity] = []
@@ -86,13 +92,22 @@ final class PortRig {
         root.components[OpacityComponent.self]?.opacity = pose.opacity
     }
 
-    /// Procedural: retint the disc. Designed: drive any material named `Glow`.
+    /// Procedural: retint the disc. Designed: drive the Glass shader's glow
+    /// colour and intensity (and any material named `Glow`).
     func setDisc(tint: UIColor, emissive: Float) {
         if let ringModel {
             AssetCatalog.setGlow(emissive, tint: tint, in: ringModel)
+            AssetCatalog.setParameter(AssetCatalog.glowIntensityParameter, emissive, in: ringModel)
+            AssetCatalog.setColorParameter(AssetCatalog.glowColorParameter, tint, in: ringModel)
         } else {
             disc.model?.materials = [Self.discMaterial(tint: tint, emissive: emissive)]
         }
+    }
+
+    /// Designed ring with the mask on: the dome fills with the session charge.
+    func setRingFill(_ fill: Float) {
+        guard let ringModel, ringGlassMask else { return }
+        AssetCatalog.setParameter(AssetCatalog.fillParameter, fill, in: ringModel)
     }
 
     /// Place the sparkles on an orbit around the disc at `phase` radians.

@@ -67,6 +67,9 @@
   },
   "config": {
     "accessSite": "arm",
+    "assetOverrides": {
+      "port_ring": { "glassMask": false }
+    },
     "chestPort": {
       "markerImage": "port-marker",
       "markerSizeMm": 50,

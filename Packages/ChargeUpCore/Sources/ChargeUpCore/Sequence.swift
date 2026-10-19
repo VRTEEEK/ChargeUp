@@ -203,6 +203,16 @@ public struct ChargeConfig: Codable, Equatable, Sendable {
     public var ratePerSecond: Double { 1 / demoDurationSec }
 }
 
+/// Per-slot tweaks for designed assets, keyed by slot file name.
+public struct AssetOverride: Codable, Equatable, Sendable {
+    /// When false, the Glass shader's fill is held at 1 so the glow is a
+    /// constant emissive with no UV mask (for small domes where a mask
+    /// would read as the whole thing switching on at once).
+    public var glassMask: Bool
+
+    public init(glassMask: Bool = true) { self.glassMask = glassMask }
+}
+
 /// Where the needle goes. `arm` uses the forearm hand-tracking anchor and the
 /// sleeve; `chestPort` uses a printed marker on the port dressing and a plate.
 public enum AccessSite: String, Codable, Equatable, Sendable {
@@ -308,6 +318,8 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
     public var accessSite: AccessSite
+    /// Keyed by asset slot name; absent means defaults.
+    public var assetOverrides: [String: AssetOverride]
     public var chestPort: ChestPortConfig
     public var visuals: VisualsConfig
     public var audio: AudioConfig
@@ -334,6 +346,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
+        assetOverrides = try c.decodeIfPresent([String: AssetOverride].self, forKey: .assetOverrides) ?? [:]
         chestPort = try c.decode(ChestPortConfig.self, forKey: .chestPort)
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
         audio = try c.decode(AudioConfig.self, forKey: .audio)
@@ -501,6 +514,11 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
     public var audioIds: [String] {
         var seen = Set<String>()
         return steps.map(\.audio).filter { seen.insert($0).inserted }
+    }
+
+    /// The override for a slot, or defaults.
+    public func assetOverride(_ slot: String) -> AssetOverride {
+        config.assetOverrides[slot] ?? AssetOverride()
     }
 
     public func index(of stepId: String) -> Int? {

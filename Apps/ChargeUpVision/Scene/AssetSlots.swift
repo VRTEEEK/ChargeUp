@@ -39,6 +39,7 @@ final class AssetCatalog {
     static let glassMaterialFile = "Materials/LanternGlass.usda"
     static let fillParameter = "fill"
     static let glowIntensityParameter = "glowIntensity"
+    static let glowColorParameter = "glowColor"
 
     private var models: [AssetSlot: Entity] = [:]
     private var images: [AssetSlot: CGImage] = [:]
@@ -159,6 +160,21 @@ final class AssetCatalog {
             if changed { entity.components.set(model) }
         }
         for child in entity.children { setParameter(name, value, in: child) }
+    }
+
+    /// Set a colour parameter on every ShaderGraph material in the tree that has it.
+    static func setColorParameter(_ name: String, _ color: UIColor, in entity: Entity) {
+        if var model = entity.components[ModelComponent.self] {
+            var changed = false
+            model.materials = model.materials.map { material in
+                guard var sg = material as? ShaderGraphMaterial, sg.parameterNames.contains(name) else { return material }
+                try? sg.setParameter(name: name, value: .color(color.cgColor))
+                changed = true
+                return sg
+            }
+            if changed { entity.components.set(model) }
+        }
+        for child in entity.children { setColorParameter(name, color, in: child) }
     }
 
     /// Set the emissive intensity on every PhysicallyBasedMaterial named `Glow`.

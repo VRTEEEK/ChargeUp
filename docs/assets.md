@@ -10,7 +10,7 @@ Units: metres, Y up, origin as described per slot. Export USDZ from Reality Comp
 |---|---|---|---|---|
 | `lantern_hero.usdz` | USDZ | Any height in metres, +Y up (the delivered hero is 0.25 m tall, 0.12 m wide, 18k triangles). Origin anywhere on the vertical axis: the app centres the model's visual bounds on the lantern position, so base-origin and centre-origin files both sit where the placeholder sat. The cable socket is derived from the bounds (36 % of the height up, at the front) | `Glass` (receives the LanternGlass shader; its `fill` drives the rising light; its own base-colour texture is not used), `Brass` or anything else untouched | Glass cylinder with frame, core and fill column |
 | `lantern_round.usdz`, `lantern_tall.usdz`, `lantern_square.usdz` | USDZ | Same as hero (currently copies of the hero file until distinct variants arrive). The sky picks a variant from a session record's `variant` field; records that say `lantern` cycle through the three | `Glass` as above | Same as hero, scaled by `config.sky.smallScale` |
-| `port_ring.usdz` | USDZ | Fits inside a 0.04 m disc; origin at the ring centre on the skin plane; +Y out of the skin; +X toward the hand (arm) or along the marker width (chest) | Any material named `Glow` gets its emissive driven by the step (cream glow, countdown pulses); others untouched | Flat blue emissive disc |
+| `port_ring.usdz` | USDZ | About 0.045 m across, origin at the base on the skin plane, +Y out of the skin (dome up); +X toward the hand (arm) or along the marker width (chest). The delivered ring is 0.045 × 0.010 m, 5,255 triangles | `Glass` receives the LanternGlass shader; the step visuals drive its `glowColor` and `glowIntensity` (cream glow, frost tint, countdown pulses, charge). Any `Glow` PBR material is driven too. `Brass` untouched | Flat blue emissive disc |
 | `port_plate.usdz` | USDZ | Chest only. About 0.12 × 0.09 m, 3 mm thick; origin at its centre on the skin plane; +Y out of the skin | none | Soft-edged rounded box |
 | `plug.usdz` | USDZ | The cable end that sits in the port. Origin where it meets the port; +Y points away from the skin along the cable | none | A short bright cylinder at the port end of the cable |
 | `spark.usdz` | USDZ | The single flush spark and the charge packets. About 0.012 m across; origin at its centre | any emissive material; the app does not change it | Emissive sphere |
@@ -23,6 +23,14 @@ Units: metres, Y up, origin as described per slot. Export USDZ from Reality Comp
 Checked in the visionOS simulator with a hand-written ASCII USD lantern carrying a material named `Glass`: the model loaded under `lantern_hero`, the material was replaced by the LanternGlass shader, the light rose from the base as `fill` increased during the infusion, the sky reused the same model, and the operator window reported it. Removing the file put the procedural placeholder back with no code change. A real USDZ export has not been through this yet; the first one should be checked for UV v direction (base = 0) and the exact material name.
 
 The ShaderGraph uses only nodes RealityKit accepts (`ND_texcoord_vector2`, `ND_separate2_vector2`, `ND_subtract_float`, `ND_smoothstep_float`, `ND_multiply_color3FA`, `ND_realitykit_pbr_surfaceshader`). `ND_invert_float` is not available on visionOS 2 and was replaced by a subtract.
+
+## Per-slot overrides
+
+`config.assetOverrides` in sequence.json, keyed by slot name:
+
+| Key | Default | Meaning |
+|---|---|---|
+| `glassMask` | true | When false the Glass shader's `fill` is held at 1, so the glow is a constant emissive with no UV mask. Set for `port_ring`: on a 3 mm dome the mask read as the whole dome switching on, so the ring now glows evenly and its intensity follows the step instead. |
 
 ## The Glass material
 

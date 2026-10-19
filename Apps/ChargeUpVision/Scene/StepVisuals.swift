@@ -104,6 +104,7 @@ final class StepVisuals {
     private func release() {
         lantern.apply(.lit)
         flow.setSpark(nil)
+        rig.setRingFill(1)
         rig.mark.isEnabled = true
         rig.seal.isEnabled = true
     }
@@ -151,6 +152,7 @@ final class StepVisuals {
             if u >= 1 { lantern.apply(.charging(level: max(charge, 0.02))) }
         case StepID.charge:
             lantern.apply(.charging(level: charge))
+            rig.setRingFill(charge)
         case StepID.release:
             flow.setExtension(Float(max(0, 1 - t / config.cableRetract)))
             let u = Float(min(1, t / config.markFade))
