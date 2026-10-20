@@ -3,7 +3,7 @@ import UIKit
 import ChargeUpCore
 
 /// Everything that rides on the forearm: the port disc, the frost sparkles,
-/// the seal patch and the charge mark. `root` takes the solved pose and the
+/// the charge mark. `root` takes the solved pose and the
 /// tracking opacity; the children are animated by StepVisuals.
 @MainActor
 final class PortRig {
@@ -13,11 +13,9 @@ final class PortRig {
     private static let sparkleRadius: Float = 0.0025
     private static let sparkleOrbit: Float = 0.028
     private static let markOuter: Float = 0.026
-    private static let sealSize = SIMD3<Float>(0.06, 0.002, 0.045)
     static let portBlue = UIColor(red: 0.2, green: 0.7, blue: 1.0, alpha: 1)
     static let frostWhite = UIColor(red: 0.85, green: 0.95, blue: 1.0, alpha: 1)
     static let markGold = UIColor(red: 1.0, green: 0.8, blue: 0.35, alpha: 1)
-    static let sealTint = UIColor(red: 0.95, green: 0.9, blue: 0.85, alpha: 1)
 
     let root = Entity()
     /// The port visual's node: scale, position and opacity are animated on
@@ -27,18 +25,50 @@ final class PortRig {
     let disc: ModelEntity
     let sparkles: [ModelEntity]
     let mark: ModelEntity
-    let seal: ModelEntity
     /// The designed port model (ring or plate), if its slot had a file.
     private let portModel: Entity?
     private let markModel: Entity?
     /// False holds the port model's Glass fill at 1 (constant emissive, no mask).
     private let glassMask: Bool
+    /// The tiled surface: a tube along the forearm (arm) or a flat surround
+    /// under the plate (chest). Placeholder geometry only; Milestone 2 task 2
+    /// (the real sleeve with occlusion) is untouched. Nil without a tile.
+    let sleeve: ModelEntity?
+    /// Which tile the sleeve got, for the operator window.
+    let sleeveTileUsed: String?
 
-    init(sparkleCount: Int, accessSite: AccessSite, plateSize: SIMD2<Float>,
-         assets: AssetCatalog? = nil, glassMask: Bool = true) {
+    init(sparkleCount: Int, accessSite: AccessSite, plateSize: SIMD2<Float>, sleeveConfig: SleeveConfig,
+         forearmRadius: Float, assets: AssetCatalog? = nil, glassMask: Bool = true) {
         self.glassMask = glassMask
         root.name = "portRoot"
         root.components.set(OpacityComponent(opacity: 1))
+
+        if let tile = assets?.sleeveTexture(named: sleeveConfig.tile) {
+            let material = AssetCatalog.sleeveMaterial(tile.texture, opacity: Float(sleeveConfig.opacity),
+                                                       tiling: Float(sleeveConfig.tileRepeat))
+            let entity: ModelEntity
+            switch accessSite {
+            case .arm:
+                // A tube around the forearm axis (+X toward the hand), its surface at the skin.
+                entity = ModelEntity(mesh: .generateCylinder(height: sleeveConfig.length, radius: forearmRadius),
+                                     materials: [material])
+                entity.orientation = simd_quatf(from: SIMD3(0, 1, 0), to: SIMD3(1, 0, 0))
+                entity.position = SIMD3(0, -forearmRadius, 0)
+            case .chestPort:
+                // A flat surround under the plate on the skin plane.
+                let size = sleeveConfig.surroundSize
+                entity = ModelEntity(mesh: .generatePlane(width: size.x, depth: size.y, cornerRadius: min(size.x, size.y) * 0.2),
+                                     materials: [material])
+                entity.position = SIMD3(0, -0.0015, 0)
+            }
+            entity.name = "sleeve"
+            sleeve = entity
+            sleeveTileUsed = tile.slot.rawValue
+            root.addChild(entity)
+        } else {
+            sleeve = nil
+            sleeveTileUsed = nil
+        }
 
         disc = ModelEntity()
         disc.name = "portVisual"
@@ -85,17 +115,14 @@ final class PortRig {
         if let markModel {
             mark.components.remove(ModelComponent.self)
             mark.addChild(markModel)
+        } else if let assets, let sprite = assets.spriteMaterial(.chargeMark) {
+            // The designed mark as a sprite lying on the skin, alpha from the PNG,
+            // sized so its opaque content spans the mark's diameter.
+            let size = Self.markOuter * 2 * assets.spriteScale(.chargeMark)
+            mark.model = ModelComponent(mesh: .generatePlane(width: size, depth: size), materials: [sprite])
+            mark.position.y = 0.0005
         }
 
-        var sealMaterial = PhysicallyBasedMaterial()
-        sealMaterial.baseColor = .init(tint: Self.sealTint)
-        sealMaterial.roughness = 0.9
-        seal = ModelEntity(mesh: .generateBox(size: Self.sealSize, cornerRadius: 0.004), materials: [sealMaterial])
-        seal.name = "sealPatch"
-        seal.position.y = Self.thickness
-        seal.components.set(OpacityComponent(opacity: 0))
-        seal.isEnabled = false
-        root.addChild(seal)
     }
 
     /// Apply a solved pose to the root. Called every frame; cheap.

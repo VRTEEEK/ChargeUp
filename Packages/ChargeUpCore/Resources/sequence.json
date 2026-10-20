@@ -67,6 +67,13 @@
   },
   "config": {
     "accessSite": "arm",
+    "sleeve": {
+      "tile": "sleeve_tile_soft",
+      "opacity": 0.6,
+      "lengthMm": 220,
+      "tileRepeat": 3,
+      "surroundSizeMm": [140, 110]
+    },
     "assetOverrides": {
       "port_ring": { "glassMask": false },
       "port_plate": { "glassMask": false }

@@ -31,8 +31,10 @@ final class SceneDirector {
         sounds = SoundBank(config: config.audio)
         let portSlot: AssetSlot = config.accessSite == .arm ? .portRing : .portPlate
         rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, accessSite: config.accessSite,
-                      plateSize: config.chestPort.plateSize, assets: assets,
+                      plateSize: config.chestPort.plateSize, sleeveConfig: config.sleeve,
+                      forearmRadius: config.forearm.forearmRadius, assets: assets,
                       glassMask: controller.sequence.assetOverride(portSlot.rawValue).glassMask)
+        controller.noteSleeve(rig.sleeveTileUsed.map { "\($0) at \(config.sleeve.opacity)" } ?? "no tile; none")
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
         lantern = ChargeObjectEntity(model: assets.model(.lanternHero))

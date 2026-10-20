@@ -179,6 +179,9 @@ final class SessionController: ObservableObject {
 
     func noteAudio(_ status: String) { audioStatus = status }
 
+    @Published private(set) var sleeveStatus = "not built"
+    func noteSleeve(_ status: String) { sleeveStatus = status }
+
     /// Called by the operator window before opening the space.
     func loadAssets() async {
         await assets.load(accessSite: sequence.config.accessSite)

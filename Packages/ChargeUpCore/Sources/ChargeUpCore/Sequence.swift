@@ -203,6 +203,24 @@ public struct ChargeConfig: Codable, Equatable, Sendable {
     public var ratePerSecond: Double { 1 / demoDurationSec }
 }
 
+/// The textured replacement over the access site: a tube around the forearm
+/// (arm) or a flat surround under the plate (chest). The tile is a PNG slot
+/// name; sleeve_tile_soft falls back to sleeve_tile when the file is absent.
+public struct SleeveConfig: Codable, Equatable, Sendable {
+    public var tile: String
+    /// 0...1 opacity of the tiled surface.
+    public var opacity: Double
+    /// Arm: length of the tube along the forearm, centred on the port.
+    public var lengthMm: Double
+    /// How many times the tile repeats around the tube / across the surround.
+    public var tileRepeat: Double
+    /// Chest: width and height of the surround under the plate.
+    public var surroundSizeMm: [Double]
+
+    public var length: Float { Float(lengthMm / 1000) }
+    public var surroundSize: SIMD2<Float> { SIMD2(Float(surroundSizeMm[0]), Float(surroundSizeMm[1])) / 1000 }
+}
+
 /// Per-slot tweaks for designed assets, keyed by slot file name.
 public struct AssetOverride: Codable, Equatable, Sendable {
     /// When false, the Glass shader's fill is held at 1 so the glow is a
@@ -318,6 +336,7 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
     public var accessSite: AccessSite
+    public var sleeve: SleeveConfig
     /// Keyed by asset slot name; absent means defaults.
     public var assetOverrides: [String: AssetOverride]
     public var chestPort: ChestPortConfig
@@ -346,6 +365,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
+        sleeve = try c.decode(SleeveConfig.self, forKey: .sleeve)
         assetOverrides = try c.decodeIfPresent([String: AssetOverride].self, forKey: .assetOverrides) ?? [:]
         chestPort = try c.decode(ChestPortConfig.self, forKey: .chestPort)
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
@@ -385,6 +405,11 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard charge.demoDurationSec > 0, charge.glanceDegrees > 0, charge.glanceSeconds > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
+        }
+        guard (0...1).contains(sleeve.opacity), sleeve.lengthMm > 0, sleeve.tileRepeat > 0,
+              sleeve.surroundSizeMm.count == 2, ["sleeve_tile", "sleeve_tile_soft"].contains(sleeve.tile) else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .sleeve, in: c, debugDescription: "sleeve config out of range or unknown tile")
         }
         guard chestPort.markerSizeMm > 0, chestPort.portOffsetFromMarkerMm.count == 3,
               chestPort.plateSizeMm.count == 2, !chestPort.markerImage.isEmpty else {

@@ -50,8 +50,6 @@ final class StepVisuals {
         rig.placeSparkles(phase: 0, visible: false)
         rig.mark.isEnabled = false
         rig.mark.components[OpacityComponent.self]?.opacity = 0
-        rig.seal.isEnabled = false
-        rig.seal.components[OpacityComponent.self]?.opacity = 0
         rig.setDisc(tint: PortRig.portBlue, emissive: 2)
         flow.setExtension(0)
         flow.setSpark(nil)
@@ -106,7 +104,6 @@ final class StepVisuals {
         flow.setSpark(nil)
         rig.setRingFill(1)
         rig.mark.isEnabled = true
-        rig.seal.isEnabled = true
     }
 
     /// Port gone, mark stays on the dressing, lantern stays lit.
@@ -114,7 +111,6 @@ final class StepVisuals {
         lantern.apply(.lit)
         flow.setExtension(0)
         rig.disc.components[OpacityComponent.self]?.opacity = 0
-        rig.seal.components[OpacityComponent.self]?.opacity = 0.85
         rig.mark.components[OpacityComponent.self]?.opacity = 1
     }
 
@@ -156,7 +152,6 @@ final class StepVisuals {
         case StepID.release:
             flow.setExtension(Float(max(0, 1 - t / config.cableRetract)))
             let u = Float(min(1, t / config.markFade))
-            rig.seal.components[OpacityComponent.self]?.opacity = 0.85 * u
             rig.mark.components[OpacityComponent.self]?.opacity = u
             rig.disc.components[OpacityComponent.self]?.opacity = 1 - u
         default:

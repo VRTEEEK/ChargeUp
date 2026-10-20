@@ -95,6 +95,8 @@ struct OperatorWindow: View {
             LabeledContent("Audio", value: controller.audioStatus)
             LabeledContent("Assets", value: controller.assetStatus)
                 .font(.footnote)
+            LabeledContent("Sleeve", value: controller.sleeveStatus)
+                .font(.footnote)
             LabeledContent("Recording", value: controller.lastRecording)
             LabeledContent("Sky") {
                 HStack {

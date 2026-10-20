@@ -18,11 +18,12 @@ enum AssetSlot: String, CaseIterable {
     case plug = "plug"
     case spark = "spark"
     case sleeveTile = "sleeve_tile"
+    case sleeveTileSoft = "sleeve_tile_soft"
     case chargeMark = "charge_mark"
     case portMarker = "port_marker"
 
     /// PNGs are read as images; everything else is a USDZ model.
-    var isImage: Bool { self == .sleeveTile || self == .portMarker }
+    var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark || self == .spark }
 
     /// port_ring and port_plate are alternatives, not layers: the ring is the
     /// arm's port, the plate is the chest's. The other one is never loaded.
@@ -53,6 +54,13 @@ final class AssetCatalog {
 
     private var models: [AssetSlot: Entity] = [:]
     private var images: [AssetSlot: CGImage] = [:]
+    private var textures: [AssetSlot: TextureResource] = [:]
+    /// Single-channel alpha of the sprite PNGs, because an opacity map reads
+    /// one colour channel, not the alpha, of an RGBA texture.
+    private var alphaMasks: [AssetSlot: TextureResource] = [:]
+    /// Fraction of the canvas the sprite's opaque pixels span (width, height),
+    /// so a glyph drawn small in a large canvas is still shown at full size.
+    private var spriteExtents: [AssetSlot: SIMD2<Float>] = [:]
     private(set) var glass: ShaderGraphMaterial?
     private(set) var placeholders: [AssetSlot] = AssetSlot.allCases
     private(set) var skipped: [AssetSlot] = []
@@ -71,6 +79,21 @@ final class AssetCatalog {
             if slot.isImage {
                 if let image = Self.loadImage(named: slot.rawValue) {
                     images[slot] = image
+                    // The marker stays a CGImage for image tracking; the rest become textures.
+                    if slot != .portMarker {
+                        do {
+                            textures[slot] = try await TextureResource(image: image, withName: slot.rawValue,
+                                                                       options: .init(semantic: .color))
+                            if slot == .chargeMark || slot == .spark, let (alpha, extent) = Self.alphaImage(of: image) {
+                                alphaMasks[slot] = try await TextureResource(image: alpha, withName: slot.rawValue + "_alpha",
+                                                                             options: .init(semantic: .raw))
+                                spriteExtents[slot] = extent
+                                Self.logger.info("sprite \(slot.rawValue, privacy: .public): opaque extent \(extent.x, format: .fixed(precision: 2)) x \(extent.y, format: .fixed(precision: 2)) of the canvas")
+                            }
+                        } catch {
+                            broken.append("\(slot.rawValue): \(error.localizedDescription)")
+                        }
+                    }
                     found.append(slot.rawValue)
                 } else {
                     missing.append(slot)
@@ -146,6 +169,81 @@ final class AssetCatalog {
     }
 
     func image(_ slot: AssetSlot) -> CGImage? { images[slot] }
+    func texture(_ slot: AssetSlot) -> TextureResource? { textures[slot] }
+
+    /// The sleeve tile named in config, falling back to the plain tile when
+    /// the soft one is absent. Nil means neither file is present.
+    func sleeveTexture(named name: String) -> (slot: AssetSlot, texture: TextureResource)? {
+        if let slot = AssetSlot(rawValue: name), let t = textures[slot] { return (slot, t) }
+        if let t = textures[.sleeveTile] { return (.sleeveTile, t) }
+        return nil
+    }
+
+    /// Tiled, translucent surface material for the sleeve and the plate surround.
+    static func sleeveMaterial(_ texture: TextureResource, opacity: Float, tiling: Float) -> PhysicallyBasedMaterial {
+        var m = PhysicallyBasedMaterial()
+        m.baseColor = .init(tint: .white, texture: .init(texture))
+        m.roughness = 0.8
+        m.metallic = 0.0
+        m.blending = .transparent(opacity: .init(floatLiteral: opacity))
+        m.textureCoordinateTransform = .init(scale: SIMD2(tiling, tiling))
+        return m
+    }
+
+    /// Sprite material for a slot: colour from the PNG, opacity from its alpha mask.
+    func spriteMaterial(_ slot: AssetSlot) -> UnlitMaterial? {
+        guard let texture = textures[slot] else { return nil }
+        var m = UnlitMaterial()
+        m.color = .init(tint: .white, texture: .init(texture))
+        if let alpha = alphaMasks[slot] {
+            m.blending = .transparent(opacity: .init(scale: 1, texture: .init(alpha)))
+        } else {
+            m.blending = .transparent(opacity: .init(floatLiteral: 1))
+        }
+        return m
+    }
+
+    /// How much to scale a sprite plane so its opaque content fills the
+    /// intended size: 1 when the glyph fills the canvas, larger when it does not.
+    func spriteScale(_ slot: AssetSlot) -> Float {
+        guard let e = spriteExtents[slot], e.x > 0.01, e.y > 0.01 else { return 1 }
+        return 1 / max(e.x, e.y)
+    }
+
+    /// The alpha channel of an image as an 8-bit grey image, plus the fraction
+    /// of the canvas covered by pixels with alpha above half.
+    static func alphaImage(of image: CGImage) -> (CGImage, SIMD2<Float>)? {
+        let w = image.width, h = image.height
+        guard let rgba = CGContext(data: nil, width: w, height: h, bitsPerComponent: 8, bytesPerRow: w * 4,
+                                   space: CGColorSpaceCreateDeviceRGB(),
+                                   bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue) else { return nil }
+        rgba.draw(image, in: CGRect(x: 0, y: 0, width: w, height: h))
+        guard let src = rgba.data else { return nil }
+        var alpha = [UInt8](repeating: 0, count: w * h)
+        let bytes = src.assumingMemoryBound(to: UInt8.self)
+        var minX = w, maxX = -1, minY = h, maxY = -1
+        for y in 0..<h {
+            for x in 0..<w {
+                let a = bytes[(y * w + x) * 4 + 3]
+                alpha[y * w + x] = a
+                if a > 127 {
+                    if x < minX { minX = x }
+                    if x > maxX { maxX = x }
+                    if y < minY { minY = y }
+                    if y > maxY { maxY = y }
+                }
+            }
+        }
+        guard let provider = CGDataProvider(data: Data(alpha) as CFData),
+              let grey = CGImage(width: w, height: h, bitsPerComponent: 8, bitsPerPixel: 8, bytesPerRow: w,
+                                 space: CGColorSpaceCreateDeviceGray(), bitmapInfo: CGBitmapInfo(rawValue: 0),
+                                 provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)
+        else { return nil }
+        let extent = maxX >= minX
+            ? SIMD2<Float>(Float(maxX - minX + 1) / Float(w), Float(maxY - minY + 1) / Float(h))
+            : SIMD2<Float>(1, 1)
+        return (grey, extent)
+    }
 
     /// Read a PNG from the package's Textures folder by name, no extension.
     nonisolated static func loadImage(named name: String) -> CGImage? {

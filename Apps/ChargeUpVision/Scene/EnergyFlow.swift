@@ -40,17 +40,33 @@ final class EnergyFlow {
         packetMaterial.baseColor = .init(tint: Self.packetColor)
         packetMaterial.emissiveColor = .init(color: Self.packetColor)
         packetMaterial.emissiveIntensity = 5
+        /// Designed spark: a model if there is one, else the PNG as a sprite that
+        /// always faces the viewer, else the procedural sphere.
+        func makeSpark(scale: Float) -> Entity {
+            if let model = assets?.model(.spark) {
+                model.scale = SIMD3(repeating: scale)
+                return model
+            }
+            if let assets, let material = assets.spriteMaterial(.spark) {
+                // The glyph should read about three packet radii across whatever
+                // fraction of its canvas it was drawn on.
+                let size = Self.packetRadius * 3 * scale * assets.spriteScale(.spark)
+                let sprite = ModelEntity(mesh: .generatePlane(width: size, height: size), materials: [material])
+                sprite.components.set(BillboardComponent())
+                return sprite
+            }
+            return ModelEntity(mesh: .generateSphere(radius: Self.packetRadius * scale), materials: [packetMaterial])
+        }
         var list: [Entity] = []
         for i in 0..<max(1, packetCount) {
-            let p: Entity = assets?.model(.spark) ?? ModelEntity(mesh: .generateSphere(radius: Self.packetRadius), materials: [packetMaterial])
+            let p = makeSpark(scale: 1)
             p.name = "packet\(i)"
             p.isEnabled = false
             list.append(p)
         }
         packets = list
-        if let designed = assets?.model(.spark) {
-            designed.scale = SIMD3(repeating: 1.6)
-            spark = designed
+        if assets?.model(.spark) != nil || assets?.texture(.spark) != nil {
+            spark = makeSpark(scale: 1.6)
         } else {
             var sparkMaterial = packetMaterial
             sparkMaterial.emissiveIntensity = 10
