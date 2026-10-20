@@ -10,6 +10,7 @@ import ChargeUpCore
 /// marker source.
 @MainActor
 enum DressingPlateEntity {
+    static let designedName = "dressingPlateDesigned"
     private static let thickness: Float = 0.003
     private static let tint = UIColor(red: 0.16, green: 0.2, blue: 0.3, alpha: 1)
 
@@ -19,7 +20,7 @@ enum DressingPlateEntity {
     /// load and logged, and `glassMask` false holds its fill at 1.
     static func make(size: SIMD2<Float>, assets: AssetCatalog? = nil, glassMask: Bool = true) -> Entity {
         if let model = assets?.model(.portPlate) {
-            model.name = "dressingPlate"
+            model.name = designedName
             if let glass = AssetCatalog.glassBounds(in: model) {
                 let dome = glass.center
                 model.position = SIMD3(-dome.x, 0, -dome.z)

@@ -20,34 +20,47 @@ final class PortRig {
     static let sealTint = UIColor(red: 0.95, green: 0.9, blue: 0.85, alpha: 1)
 
     let root = Entity()
-    /// The port visual. With a designed `port_ring` the disc mesh is hidden and
-    /// the model hangs under it, so scale, position and opacity still apply.
+    /// The port visual's node: scale, position and opacity are animated on
+    /// it. On the arm it carries the placeholder disc mesh or the designed
+    /// ring; on the chest it carries the plate (designed or procedural) and
+    /// no disc. The ring and the plate are alternatives, never layered.
     let disc: ModelEntity
     let sparkles: [ModelEntity]
     let mark: ModelEntity
     let seal: ModelEntity
-    private let ringModel: Entity?
+    /// The designed port model (ring or plate), if its slot had a file.
+    private let portModel: Entity?
     private let markModel: Entity?
-    /// False holds the ring's Glass fill at 1 (constant emissive, no mask).
-    private let ringGlassMask: Bool
+    /// False holds the port model's Glass fill at 1 (constant emissive, no mask).
+    private let glassMask: Bool
 
-    init(sparkleCount: Int, assets: AssetCatalog? = nil, ringGlassMask: Bool = true) {
-        self.ringGlassMask = ringGlassMask
+    init(sparkleCount: Int, accessSite: AccessSite, plateSize: SIMD2<Float>,
+         assets: AssetCatalog? = nil, glassMask: Bool = true) {
+        self.glassMask = glassMask
         root.name = "portRoot"
         root.components.set(OpacityComponent(opacity: 1))
 
-        disc = ModelEntity(mesh: .generateCylinder(height: Self.thickness, radius: Self.diameter / 2),
-                           materials: [Self.discMaterial(tint: Self.portBlue, emissive: 2)])
-        disc.name = "portDisc"
+        disc = ModelEntity()
+        disc.name = "portVisual"
         disc.components.set(OpacityComponent(opacity: 1))
         root.addChild(disc)
-        ringModel = assets?.model(.portRing)
-        if let ringModel {
-            // The ring's origin is its base; the rig root is the skin plane, so
-            // it sits on the skin where the placeholder disc did.
-            disc.components.remove(ModelComponent.self)
-            disc.addChild(ringModel)
-            AssetCatalog.setParameter(AssetCatalog.fillParameter, ringGlassMask ? 0 : 1, in: ringModel)
+        switch accessSite {
+        case .arm:
+            portModel = assets?.model(.portRing)
+            if let portModel {
+                // The ring's origin is its base; the rig root is the skin plane.
+                disc.addChild(portModel)
+            } else {
+                disc.model = ModelComponent(mesh: .generateCylinder(height: Self.thickness, radius: Self.diameter / 2),
+                                            materials: [Self.discMaterial(tint: Self.portBlue, emissive: 2)])
+            }
+        case .chestPort:
+            let plate = DressingPlateEntity.make(size: plateSize, assets: assets, glassMask: glassMask)
+            portModel = plate.name == DressingPlateEntity.designedName ? plate : nil
+            disc.addChild(plate)
+        }
+        if let portModel {
+            AssetCatalog.setParameter(AssetCatalog.fillParameter, glassMask ? 0 : 1, in: portModel)
         }
 
         var list: [ModelEntity] = []
@@ -92,22 +105,22 @@ final class PortRig {
         root.components[OpacityComponent.self]?.opacity = pose.opacity
     }
 
-    /// Procedural: retint the disc. Designed: drive the Glass shader's glow
-    /// colour and intensity (and any material named `Glow`).
+    /// Procedural disc: retint it. Designed ring or plate: drive the Glass
+    /// shader's glow colour and intensity (and any material named `Glow`).
     func setDisc(tint: UIColor, emissive: Float) {
-        if let ringModel {
-            AssetCatalog.setGlow(emissive, tint: tint, in: ringModel)
-            AssetCatalog.setParameter(AssetCatalog.glowIntensityParameter, emissive, in: ringModel)
-            AssetCatalog.setColorParameter(AssetCatalog.glowColorParameter, tint, in: ringModel)
-        } else {
+        if let portModel {
+            AssetCatalog.setGlow(emissive, tint: tint, in: portModel)
+            AssetCatalog.setParameter(AssetCatalog.glowIntensityParameter, emissive, in: portModel)
+            AssetCatalog.setColorParameter(AssetCatalog.glowColorParameter, tint, in: portModel)
+        } else if disc.model != nil {
             disc.model?.materials = [Self.discMaterial(tint: tint, emissive: emissive)]
         }
     }
 
-    /// Designed ring with the mask on: the dome fills with the session charge.
+    /// Designed port model with the mask on: its glass fills with the charge.
     func setRingFill(_ fill: Float) {
-        guard let ringModel, ringGlassMask else { return }
-        AssetCatalog.setParameter(AssetCatalog.fillParameter, fill, in: ringModel)
+        guard let portModel, glassMask else { return }
+        AssetCatalog.setParameter(AssetCatalog.fillParameter, fill, in: portModel)
     }
 
     /// Place the sparkles on an orbit around the disc at `phase` radians.

@@ -118,6 +118,11 @@ final class ChargeObjectEntity {
             model.position = -bounds.center
             modelBounds = bounds
             body.addChild(model)
+            // The shader masks on object-space height: tell it where this
+            // model's glass starts and how tall it is.
+            let glass = AssetCatalog.glassBounds(in: model) ?? bounds
+            AssetCatalog.setParameter("baseY", glass.min.y, in: model)
+            AssetCatalog.setParameter("height", max(0.001, glass.max.y - glass.min.y), in: model)
         }
 
         apply(.dark)

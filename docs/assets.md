@@ -9,7 +9,7 @@ Units: metres, Y up, origin as described per slot. Export USDZ from Reality Comp
 | File name | Format | Scale and origin | Material names the app looks for | Placeholder today |
 |---|---|---|---|---|
 | `lantern_hero.usdz` | USDZ | Any height in metres, +Y up (the delivered hero is 0.25 m tall, 0.12 m wide, 18k triangles). Origin anywhere on the vertical axis: the app centres the model's visual bounds on the lantern position, so base-origin and centre-origin files both sit where the placeholder sat. The cable socket is derived from the bounds (36 % of the height up, at the front) | `Glass` (receives the LanternGlass shader; its `fill` drives the rising light; its own base-colour texture is not used), `Brass` or anything else untouched | Glass cylinder with frame, core and fill column |
-| `lantern_round.usdz`, `lantern_tall.usdz`, `lantern_square.usdz` | USDZ | Same as hero (currently copies of the hero file until distinct variants arrive). The sky picks a variant from a session record's `variant` field; records that say `lantern` cycle through the three | `Glass` as above | Same as hero, scaled by `config.sky.smallScale` |
+| `lantern_round.usdz`, `lantern_tall.usdz`, `lantern_square.usdz` | USDZ | Same as hero. Absent for now: a missing variant falls back to the hero model, so the sky uses the hero at variant scale until distinct variants arrive. The sky picks a variant from a session record's `variant` field; records that say `lantern` cycle through the three | `Glass` as above | Same as hero, scaled by `config.sky.smallScale` |
 | `port_ring.usdz` | USDZ | About 0.045 m across, origin at the base on the skin plane, +Y out of the skin (dome up); +X toward the hand (arm) or along the marker width (chest). The delivered ring is 0.045 × 0.010 m, 5,255 triangles | `Glass` receives the LanternGlass shader; the step visuals drive its `glowColor` and `glowIntensity` (cream glow, frost tint, countdown pulses, charge). Any `Glow` PBR material is driven too. `Brass` untouched | Flat blue emissive disc |
 | `port_plate.usdz` | USDZ | Chest only. Origin at the plate centre on the skin plane, +Y out of the skin, dome up. The delivered plate is 0.080 × 0.057 m, 0.0097 m thick, 6,000 triangles, with the dome offset from the plate centre. At load the app measures the Glass mesh's XZ centre, logs it, and shifts the plate by the negative so the dome sits at the port pose; `config.chestPort.portOffsetFromMarkerMm` must therefore point at the dome, not the plate centre | `Glass` receives the LanternGlass shader (fill held at 1 via `assetOverrides.port_plate.glassMask: false`); `Brass` untouched | Soft-edged rounded box |
 | `plug.usdz` | USDZ | The cable end that sits in the port. Origin where it meets the port; +Y points away from the skin along the cable | none | A short bright cylinder at the port end of the cable |
@@ -20,9 +20,11 @@ Units: metres, Y up, origin as described per slot. Export USDZ from Reality Comp
 
 ## Verified so far
 
-Checked in the visionOS simulator with a hand-written ASCII USD lantern carrying a material named `Glass`: the model loaded under `lantern_hero`, the material was replaced by the LanternGlass shader, the light rose from the base as `fill` increased during the infusion, the sky reused the same model, and the operator window reported it. Removing the file put the procedural placeholder back with no code change. A real USDZ export has not been through this yet; the first one should be checked for UV v direction (base = 0) and the exact material name.
+Checked in the visionOS simulator with the delivered `lantern_hero`, `port_ring` and `port_plate`: each loaded under its slot, `Glass` was replaced by the LanternGlass shader, brass rendered with its textures, and with the height-based mask the hero's light rises from the base during the infusion (its UVs are an atlas, which is why the mask is positional). Removing a file puts the procedural placeholder back with no code change.
 
-The ShaderGraph uses only nodes RealityKit accepts (`ND_texcoord_vector2`, `ND_separate2_vector2`, `ND_subtract_float`, `ND_smoothstep_float`, `ND_multiply_color3FA`, `ND_realitykit_pbr_surfaceshader`). `ND_invert_float` is not available on visionOS 2 and was replaced by a subtract.
+The ShaderGraph uses only nodes RealityKit accepts (`ND_position_vector3`, `ND_separate3_vector3`, `ND_subtract_float`, `ND_divide_float`, `ND_smoothstep_float`, `ND_multiply_color3FA`, `ND_realitykit_pbr_surfaceshader`). `ND_invert_float` is not available on visionOS 2.
+
+`port_ring` and `port_plate` are alternatives, not layers: with `config.accessSite` arm the loader loads the ring and never requests the plate; with chestPort it loads the plate and never requests the ring. The unused one costs nothing.
 
 ## Per-slot overrides
 
@@ -38,8 +40,9 @@ The ShaderGraph uses only nodes RealityKit accepts (`ND_texcoord_vector2`, `ND_s
 
 | Parameter | Type | Meaning |
 |---|---|---|
-| `fill` | float 0…1 | Emissive is masked against the mesh's UV **v**: faces with v below `fill` glow, so light rises from the base. The lantern's UVs must run v = 0 at the base to v = 1 at the top. |
-| `softness` | float | Width of the soft edge at the top of the light, in UV units (0.08). |
+| `fill` | float 0…1 | Emissive is masked against object-space height: points whose normalised height (`(y - baseY) / height`) is below `fill` glow, so light rises from the base whatever the UV layout. The app sets `baseY` and `height` from the Glass mesh bounds at load. |
+| `softness` | float | Width of the soft edge at the top of the light, as a fraction of the height (0.08). |
+| `baseY`, `height` | float | The Glass mesh's lowest y and its height in the model's frame; set by the app, not by hand. |
 | `glowColor`, `glowIntensity` | color, float | The light. |
 | `glassColor`, `glassOpacity` | color, float | The glass when dark. |
 

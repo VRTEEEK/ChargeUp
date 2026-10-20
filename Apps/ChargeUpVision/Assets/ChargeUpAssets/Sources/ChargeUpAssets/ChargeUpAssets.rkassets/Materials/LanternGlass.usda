@@ -12,7 +12,10 @@ def Xform "Root"
 {
     def Material "LanternGlass"
     {
-        // 0 = dark, 1 = full. Emissive is masked against UV v so light rises from the base.
+        // 0 = dark, 1 = full. Emissive is masked against object-space height
+        // (position y from baseY over height) so light rises from the base
+        // whatever the mesh's UV layout. The app sets baseY and height from
+        // the Glass mesh bounds at load.
         float inputs:fill = 0 (
             customData = {
                 dictionary realitykit = {
@@ -62,26 +65,61 @@ def Xform "Root"
                 }
             }
         )
+        float inputs:baseY = 0 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 660)
+                    int stackingOrderInSubgraph = 7
+                }
+            }
+        )
+        float inputs:height = 1 (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 760)
+                    int stackingOrderInSubgraph = 8
+                }
+            }
+        )
         token outputs:mtlx:surface.connect = </Root/LanternGlass/Surface.outputs:out>
         token outputs:realitykit:vertex
         float2 ui:nodegraph:node:pos = (0, 0)
         float2 ui:nodegraph:realitykit:subgraphOutputs:pos = (300, 100)
 
-        def Shader "TexCoord"
+        def Shader "Position"
         {
-            uniform token info:id = "ND_texcoord_vector2"
-            int inputs:index = 0
-            float2 outputs:out
+            uniform token info:id = "ND_position_vector3"
+            string inputs:space = "object"
+            float3 outputs:out
             float2 ui:nodegraph:node:pos = (-700, 0)
         }
 
         def Shader "Separate"
         {
-            uniform token info:id = "ND_separate2_vector2"
-            float2 inputs:in.connect = </Root/LanternGlass/TexCoord.outputs:out>
+            uniform token info:id = "ND_separate3_vector3"
+            float3 inputs:in.connect = </Root/LanternGlass/Position.outputs:out>
             float outputs:outx
             float outputs:outy
+            float outputs:outz
             float2 ui:nodegraph:node:pos = (-520, 0)
+        }
+
+        def Shader "AboveBase"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1.connect = </Root/LanternGlass/Separate.outputs:outy>
+            float inputs:in2.connect = </Root/LanternGlass.inputs:baseY>
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-520, -120)
+        }
+
+        def Shader "Normalised"
+        {
+            uniform token info:id = "ND_divide_float"
+            float inputs:in1.connect = </Root/LanternGlass/AboveBase.outputs:out>
+            float inputs:in2.connect = </Root/LanternGlass.inputs:height>
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-420, -120)
         }
 
         def Shader "LowEdge"
@@ -96,7 +134,7 @@ def Xform "Root"
         def Shader "Step"
         {
             uniform token info:id = "ND_smoothstep_float"
-            float inputs:in.connect = </Root/LanternGlass/Separate.outputs:outy>
+            float inputs:in.connect = </Root/LanternGlass/Normalised.outputs:out>
             float inputs:low.connect = </Root/LanternGlass/LowEdge.outputs:out>
             float inputs:high.connect = </Root/LanternGlass.inputs:fill>
             float outputs:out

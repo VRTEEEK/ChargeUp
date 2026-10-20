@@ -181,7 +181,7 @@ final class SessionController: ObservableObject {
 
     /// Called by the operator window before opening the space.
     func loadAssets() async {
-        await assets.load()
+        await assets.load(accessSite: sequence.config.accessSite)
         assetStatus = assets.status
     }
 

@@ -29,12 +29,10 @@ final class SceneDirector {
         ChargeObjectEntity.glowLevels = (dark: Float(config.lantern.glowDark), charging: Float(config.lantern.glowCharging),
                                    glance: Float(config.lantern.glowGlance), lit: Float(config.lantern.glowLit))
         sounds = SoundBank(config: config.audio)
-        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, assets: assets,
-                      ringGlassMask: controller.sequence.assetOverride(AssetSlot.portRing.rawValue).glassMask)
-        if config.accessSite == .chestPort {
-            rig.root.addChild(DressingPlateEntity.make(size: config.chestPort.plateSize, assets: assets,
-                                                       glassMask: controller.sequence.assetOverride(AssetSlot.portPlate.rawValue).glassMask))
-        }
+        let portSlot: AssetSlot = config.accessSite == .arm ? .portRing : .portPlate
+        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, accessSite: config.accessSite,
+                      plateSize: config.chestPort.plateSize, assets: assets,
+                      glassMask: controller.sequence.assetOverride(portSlot.rawValue).glassMask)
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
         lantern = ChargeObjectEntity(model: assets.model(.lanternHero))

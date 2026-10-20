@@ -24,6 +24,16 @@ enum AssetSlot: String, CaseIterable {
     /// PNGs are read as images; everything else is a USDZ model.
     var isImage: Bool { self == .sleeveTile || self == .portMarker }
 
+    /// port_ring and port_plate are alternatives, not layers: the ring is the
+    /// arm's port, the plate is the chest's. The other one is never loaded.
+    func applies(to site: AccessSite) -> Bool {
+        switch self {
+        case .portRing: return site == .arm
+        case .portPlate: return site == .chestPort
+        default: return true
+        }
+    }
+
     static let lanternVariants: [AssetSlot] = [.lanternRound, .lanternTall, .lanternSquare]
 }
 
@@ -45,17 +55,19 @@ final class AssetCatalog {
     private var images: [AssetSlot: CGImage] = [:]
     private(set) var glass: ShaderGraphMaterial?
     private(set) var placeholders: [AssetSlot] = AssetSlot.allCases
+    private(set) var skipped: [AssetSlot] = []
     private(set) var loaded = false
     private(set) var status = "not loaded"
 
-    /// Try every slot once. Missing files are expected; a file that exists
-    /// but fails to load is reported by name.
-    func load() async {
+    /// Try every slot that applies to the access site once. Missing files are
+    /// expected; a file that exists but fails to load is reported by name.
+    func load(accessSite: AccessSite) async {
         guard !loaded else { return }
         var found: [String] = []
         var broken: [String] = []
         var missing: [AssetSlot] = []
-        for slot in AssetSlot.allCases {
+        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite) }
+        for slot in AssetSlot.allCases where slot.applies(to: accessSite) {
             if slot.isImage {
                 if let image = Self.loadImage(named: slot.rawValue) {
                     images[slot] = image
@@ -85,7 +97,7 @@ final class AssetCatalog {
         }
         placeholders = missing
         loaded = true
-        var parts = ["\(found.count) designed, \(missing.count) placeholder"]
+        var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skipped.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
         parts.append(glass == nil ? "glass shader missing" : "glass shader ok")
         if !broken.isEmpty { parts.append("broken: " + broken.joined(separator: "; ")) }
         status = parts.joined(separator: ", ")
