@@ -246,11 +246,41 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     public var bobAmplitude: Float { Float(bobAmplitudeM) }
 }
 
+public enum SleeveStyle: String, Codable, Equatable, Sendable {
+    /// Placeholder tube or flat surround carrying the tile.
+    case tube
+    /// Soft radial glow at the port, growing along the forearm with the charge.
+    case glow
+}
+
+/// The glow style's numbers.
+public struct SiteGlowConfig: Codable, Equatable, Sendable {
+    /// How faintly the tile shows inside the glow.
+    public var tileOpacity: Double
+    /// Extent along the forearm at zero and at full charge.
+    public var extentMinMm: Double
+    public var extentMaxMm: Double
+    /// Across the forearm.
+    public var widthMm: Double
+    /// Chest: disc diameter around the dome.
+    public var chestDiscMm: Double
+    /// How much brighter a countdown pulse makes it (0 = none).
+    public var pulseGain: Double
+    public var intensity: Double
+
+    public var extentMin: Float { Float(extentMinMm / 1000) }
+    public var extentMax: Float { Float(extentMaxMm / 1000) }
+    public var width: Float { Float(widthMm / 1000) }
+    public var chestDisc: Float { Float(chestDiscMm / 1000) }
+}
+
 /// The textured replacement over the access site: a tube around the forearm
 /// (arm) or a flat surround under the plate (chest). The tile is a PNG slot
 /// name; sleeve_tile_soft falls back to sleeve_tile when the file is absent.
 public struct SleeveConfig: Codable, Equatable, Sendable {
+    public var style: SleeveStyle
     public var tile: String
+    public var glow: SiteGlowConfig
     /// 0...1 opacity of the tiled surface.
     public var opacity: Double
     /// Arm: length of the tube along the forearm, centred on the port.
@@ -324,6 +354,24 @@ public struct VisualsConfig: Codable, Equatable, Sendable {
     public var flowSpeedMps: Double
     /// swab: sparkles orbiting the port.
     public var frostSparkleCount: Int
+    /// The cable: core and halo diameters, halo opacity, sag at mid-span, colour.
+    public var cableCoreMm: Double
+    public var cableHaloMm: Double
+    public var cableHaloOpacity: Double
+    public var cableSagM: Double
+    /// "#RRGGBB".
+    public var cableColor: String
+
+    public var cableCore: Float { Float(cableCoreMm / 1000) }
+    public var cableHalo: Float { Float(cableHaloMm / 1000) }
+    public var cableSag: Float { Float(cableSagM) }
+    /// 0...1 components of cableColor.
+    public var cableRGB: SIMD3<Float> {
+        var hex = cableColor
+        if hex.hasPrefix("#") { hex.removeFirst() }
+        guard hex.count == 6, let v = UInt32(hex, radix: 16) else { return SIMD3(1, 0.7, 0.28) }
+        return SIMD3(Float((v >> 16) & 0xFF), Float((v >> 8) & 0xFF), Float(v & 0xFF)) / 255
+    }
 
     public var creamGlow: TimeInterval { Double(creamGlowMs) / 1000 }
     public var flushSpark: TimeInterval { Double(flushSparkMs) / 1000 }
@@ -457,6 +505,12 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .companion, in: c, debugDescription: "companion config out of range")
         }
+        guard (0...1).contains(sleeve.glow.tileOpacity), sleeve.glow.extentMinMm > 0,
+              sleeve.glow.extentMaxMm >= sleeve.glow.extentMinMm, sleeve.glow.widthMm > 0,
+              sleeve.glow.chestDiscMm > 0, sleeve.glow.pulseGain >= 0, sleeve.glow.intensity >= 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .sleeve, in: c, debugDescription: "sleeve.glow config out of range")
+        }
         guard (0...1).contains(sleeve.opacity), sleeve.lengthMm > 0, sleeve.tileRepeat > 0,
               sleeve.surroundSizeMm.count == 2, ["sleeve_tile", "sleeve_tile_soft"].contains(sleeve.tile) else {
             throw DecodingError.dataCorruptedError(
@@ -469,7 +523,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
               visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,
-              visuals.flowPacketCount > 0, visuals.flowSpeedMps > 0 else {
+              visuals.flowPacketCount > 0, visuals.flowSpeedMps > 0,
+              visuals.cableCoreMm > 0, visuals.cableHaloMm >= visuals.cableCoreMm,
+              (0...1).contains(visuals.cableHaloOpacity), visuals.cableSagM >= 0,
+              visuals.cableColor.count == 7, visuals.cableColor.hasPrefix("#") else {
             throw DecodingError.dataCorruptedError(
                 forKey: .visuals, in: c, debugDescription: "visuals config values must be > 0")
         }

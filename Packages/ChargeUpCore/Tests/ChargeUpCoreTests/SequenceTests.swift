@@ -58,6 +58,16 @@ import Testing
         #expect(throws: SequenceError.missingPrompt(StepID.flush)) { try load(json) }
     }
 
+    @Test func sleeveGlowIsDefaultAndCableIsAmber() throws {
+        let seq = try ChargeSequence.shipped()
+        #expect(seq.config.sleeve.style == .glow)
+        #expect(seq.config.sleeve.glow.extentMinMm == 40 && seq.config.sleeve.glow.extentMaxMm == 140)
+        #expect(seq.config.visuals.cableColor == "#FFB347")
+        let rgb = seq.config.visuals.cableRGB
+        #expect(abs(rgb.x - 1) < 1e-6 && abs(rgb.y - 179.0 / 255) < 1e-6 && abs(rgb.z - 71.0 / 255) < 1e-6)
+        #expect(seq.config.visuals.cableCoreMm == 6)
+    }
+
     @Test func companionCuesPerStepAndOffByDefault() throws {
         let seq = try ChargeSequence.shipped()
         #expect(!seq.config.companion.enabled)

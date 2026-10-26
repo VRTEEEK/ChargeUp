@@ -80,8 +80,18 @@
     },
     "accessSite": "arm",
     "sleeve": {
+      "style": "glow",
       "tile": "sleeve_tile_soft",
       "opacity": 0.6,
+      "glow": {
+        "tileOpacity": 0.25,
+        "extentMinMm": 40,
+        "extentMaxMm": 140,
+        "widthMm": 70,
+        "chestDiscMm": 90,
+        "pulseGain": 0.6,
+        "intensity": 0.9
+      },
       "lengthMm": 220,
       "tileRepeat": 3,
       "surroundSizeMm": [140, 110]
@@ -107,6 +117,11 @@
       "markFadeMs": 800,
       "flowPacketCount": 6,
       "flowSpeedMps": 0.5,
+      "cableCoreMm": 6,
+      "cableHaloMm": 22,
+      "cableHaloOpacity": 0.22,
+      "cableSagM": 0.03,
+      "cableColor": "#FFB347",
       "frostSparkleCount": 8
     },
     "audio": {

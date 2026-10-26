@@ -75,6 +75,8 @@ final class AssetCatalog {
     /// so a glyph drawn small in a large canvas is still shown at full size.
     private var spriteExtents: [AssetSlot: SIMD2<Float>] = [:]
     private(set) var glass: ShaderGraphMaterial?
+    private(set) var siteGlow: ShaderGraphMaterial?
+    private(set) var cableLight: ShaderGraphMaterial?
     private(set) var placeholders: [AssetSlot] = AssetSlot.allCases
     private(set) var skipped: [AssetSlot] = []
     private(set) var loaded = false
@@ -131,11 +133,25 @@ final class AssetCatalog {
             Self.logger.error("LanternGlass: \(String(describing: error), privacy: .public)")
             broken.append("LanternGlass: \(error.localizedDescription)")
         }
+        do {
+            siteGlow = try await ShaderGraphMaterial(named: "/Root/SiteGlow", from: "Materials/SiteGlow.usda", in: chargeUpAssetsBundle)
+        } catch {
+            Self.logger.error("SiteGlow: \(String(describing: error), privacy: .public)")
+            broken.append("SiteGlow: \(error.localizedDescription)")
+        }
+        do {
+            cableLight = try await ShaderGraphMaterial(named: "/Root/CableLight", from: "Materials/CableLight.usda", in: chargeUpAssetsBundle)
+        } catch {
+            Self.logger.error("CableLight: \(String(describing: error), privacy: .public)")
+            broken.append("CableLight: \(error.localizedDescription)")
+        }
         placeholders = missing
         loaded = true
         let skippedText = skipped.contains(where: \.isCompanion) ? "companion off, " : ""
         var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skippedText)\(skipped.filter { !$0.isCompanion }.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
         parts.append(glass == nil ? "glass shader missing" : "glass shader ok")
+        parts.append(siteGlow == nil ? "glow shader missing" : "glow ok")
+        parts.append(cableLight == nil ? "cable shader missing" : "cable ok")
         if !broken.isEmpty { parts.append("broken: " + broken.joined(separator: "; ")) }
         status = parts.joined(separator: ", ")
     }

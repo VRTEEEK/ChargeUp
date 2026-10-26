@@ -28,6 +28,12 @@ The ShaderGraph uses only nodes RealityKit accepts (`ND_position_vector3`, `ND_s
 
 Delivered 20 Oct 2026: `charge_mark.png`, `spark.png`, `port_marker.png` and `sleeve_tile.png`, all 1254 px square. The zip had no `sleeve_tile_soft.png`, so with the default config the app falls back to the plain tile and says so in the operator window; drop the soft file in and the default picks it up. The two RGBA sprites draw their glyph on a fraction of the canvas (spark 19 × 25 %, mark 41 × 89 %); the loader measures the opaque extent and scales the sprite plane so the glyph, not the canvas, fills the intended size. Opacity comes from a single-channel alpha mask the loader builds from the PNG, because RealityKit's opacity map reads a colour channel. The marker emblem has not been tracked on a device.
 
+## Sleeve styles and the cable
+
+`config.sleeve.style` is `glow` by default: `Materials/SiteGlow.usda`, a soft radial patch on the skin at the port (amber at the centre fading to nothing on UV distance, so the patch mesh never shows an edge) with `config.sleeve.tile` mixed in at `glow.tileOpacity` (0.25). On the arm its extent along the forearm grows from `glow.extentMinMm` (40) at cream to `glow.extentMaxMm` (140) at full charge, `glow.widthMm` across; on the chest it is a disc of `glow.chestDiscMm` around the dome. It brightens by `glow.pulseGain` with each countdown pulse. `style = tube` keeps the old textured tube or surround (placeholder geometry). `glow.intensity` is 0.9: the surface is unlit and not tone-mapped, so values much above 1 blow the centre to white.
+
+The cable is `Materials/CableLight.usda` on a tube mesh rebuilt each frame along a parabolic sag (`visuals.cableSagM`, 0.03 at mid-span) from the port to the lantern socket: a core of `visuals.cableCoreMm` (6) in `visuals.cableColor` (`#FFB347`) and a halo of `visuals.cableHaloMm` (22) at `visuals.cableHaloOpacity` (0.22), both unlit until connect and then lit from the port end toward the lantern as the connect step's `lit` parameter grows. It is not present at all during countdown. The sparks run along the same curve.
+
 ## Companion (off by default)
 
 `config.companion.enabled` (false) gates a character beside the lantern. Slots, all USDZ in the `.rkassets` folder:

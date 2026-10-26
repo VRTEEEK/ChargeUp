@@ -34,6 +34,8 @@ final class PortRig {
     /// under the plate (chest). Placeholder geometry only; Milestone 2 task 2
     /// (the real sleeve with occlusion) is untouched. Nil without a tile.
     let sleeve: ModelEntity?
+    /// The glow-style sleeve; nil for the tube style or without the shader.
+    let glow: SiteGlowEntity?
     /// Which tile the sleeve got, for the operator window.
     let sleeveTileUsed: String?
 
@@ -43,7 +45,18 @@ final class PortRig {
         root.name = "portRoot"
         root.components.set(OpacityComponent(opacity: 1))
 
-        if let tile = assets?.sleeveTexture(named: sleeveConfig.tile) {
+        if sleeveConfig.style == .glow {
+            sleeve = nil
+            if let assets, let g = SiteGlowEntity(assets: assets, sleeve: sleeveConfig, accessSite: accessSite, forearmRadius: forearmRadius) {
+                glow = g
+                root.addChild(g.root)
+                sleeveTileUsed = assets.sleeveTexture(named: sleeveConfig.tile).map { "glow with \($0.slot.rawValue)" } ?? "glow, no tile"
+            } else {
+                glow = nil
+                sleeveTileUsed = "glow shader missing"
+            }
+        } else if let tile = assets?.sleeveTexture(named: sleeveConfig.tile) {
+            glow = nil
             let material = AssetCatalog.sleeveMaterial(tile.texture, opacity: Float(sleeveConfig.opacity),
                                                        tiling: Float(sleeveConfig.tileRepeat))
             let entity: ModelEntity
@@ -67,6 +80,7 @@ final class PortRig {
             root.addChild(entity)
         } else {
             sleeve = nil
+            glow = nil
             sleeveTileUsed = nil
         }
 

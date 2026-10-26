@@ -1,0 +1,118 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    // Soft radial glow lying on the skin, amber at the port fading to nothing.
+    // The mesh's UVs run 0...1 across the patch with the port at (0.5, 0.5);
+    // falloff is on distance from that centre, so the patch's edge is never seen.
+    def Material "SiteGlow"
+    {
+        color3f inputs:glowColor = (1, 0.7, 0.28)
+        float inputs:intensity = 2.5
+        float inputs:tileOpacity = 0.25
+        float inputs:hasTile = 0
+        asset inputs:tile = @@ (
+            colorSpace = "srgb_texture"
+        )
+        float inputs:tileRepeat = 2
+        token outputs:mtlx:surface.connect = </Root/SiteGlow/Surface.outputs:out>
+        token outputs:realitykit:vertex
+
+        def Shader "TexCoord"
+        {
+            uniform token info:id = "ND_texcoord_vector2"
+            int inputs:index = 0
+            float2 outputs:out
+        }
+
+        def Shader "Centred"
+        {
+            uniform token info:id = "ND_subtract_vector2"
+            float2 inputs:in1.connect = </Root/SiteGlow/TexCoord.outputs:out>
+            float2 inputs:in2 = (0.5, 0.5)
+            float2 outputs:out
+        }
+
+        def Shader "Dist"
+        {
+            uniform token info:id = "ND_magnitude_vector2"
+            float2 inputs:in.connect = </Root/SiteGlow/Centred.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "Falloff"
+        {
+            uniform token info:id = "ND_smoothstep_float"
+            float inputs:in.connect = </Root/SiteGlow/Dist.outputs:out>
+            float inputs:low = 0.08
+            float inputs:high = 0.5
+            float outputs:out
+        }
+
+        def Shader "Alpha"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1 = 1
+            float inputs:in2.connect = </Root/SiteGlow/Falloff.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "Tiled"
+        {
+            uniform token info:id = "ND_multiply_vector2FA"
+            float2 inputs:in1.connect = </Root/SiteGlow/TexCoord.outputs:out>
+            float inputs:in2.connect = </Root/SiteGlow.inputs:tileRepeat>
+            float2 outputs:out
+        }
+
+        def Shader "TileImage"
+        {
+            uniform token info:id = "ND_image_color3"
+            asset inputs:file.connect = </Root/SiteGlow.inputs:tile>
+            float2 inputs:texcoord.connect = </Root/SiteGlow/Tiled.outputs:out>
+            string inputs:uaddressmode = "periodic"
+            string inputs:vaddressmode = "periodic"
+            color3f outputs:out
+        }
+
+        def Shader "TileWeight"
+        {
+            uniform token info:id = "ND_multiply_float"
+            float inputs:in1.connect = </Root/SiteGlow.inputs:tileOpacity>
+            float inputs:in2.connect = </Root/SiteGlow.inputs:hasTile>
+            float outputs:out
+        }
+
+        def Shader "TileMix"
+        {
+            uniform token info:id = "ND_mix_color3"
+            color3f inputs:bg.connect = </Root/SiteGlow.inputs:glowColor>
+            color3f inputs:fg.connect = </Root/SiteGlow/TileImage.outputs:out>
+            float inputs:mix.connect = </Root/SiteGlow/TileWeight.outputs:out>
+            color3f outputs:out
+        }
+
+        def Shader "Emissive"
+        {
+            uniform token info:id = "ND_multiply_color3FA"
+            color3f inputs:in1.connect = </Root/SiteGlow/TileMix.outputs:out>
+            float inputs:in2.connect = </Root/SiteGlow.inputs:intensity>
+            color3f outputs:out
+        }
+
+        def Shader "Surface"
+        {
+            uniform token info:id = "ND_realitykit_unlit_surfaceshader"
+            color3f inputs:color.connect = </Root/SiteGlow/Emissive.outputs:out>
+            float inputs:opacity.connect = </Root/SiteGlow/Alpha.outputs:out>
+            bool inputs:applyPostProcessToneMap = 0
+            bool inputs:hasPremultipliedAlpha = 0
+            token outputs:out
+        }
+    }
+}

@@ -36,13 +36,13 @@ final class SceneDirector {
                       plateSize: config.chestPort.plateSize, sleeveConfig: config.sleeve,
                       forearmRadius: config.forearm.forearmRadius, assets: assets,
                       glassMask: controller.sequence.assetOverride(portSlot.rawValue).glassMask)
-        controller.noteSleeve(rig.sleeveTileUsed.map { "\($0) at \(config.sleeve.opacity)" } ?? "no tile; none")
+        controller.noteSleeve(rig.sleeveTileUsed.map { config.sleeve.style == .glow ? $0 : "\($0) at \(config.sleeve.opacity)" } ?? "no tile; none")
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
         lantern = ChargeObjectEntity(model: assets.model(.lanternHero))
         lantern.root.isEnabled = false
         lantern.root.addChild(sounds.lanternSource)
-        flow = EnergyFlow(packetCount: config.visuals.flowPacketCount, speedMps: config.visuals.flowSpeedMps, assets: assets)
+        flow = EnergyFlow(config: config.visuals, assets: assets)
         visuals = StepVisuals(config: config.visuals, rig: rig, lantern: lantern, flow: flow)
         sky = LanternSky(config: config.sky, assets: assets)
         lantern.root.addChild(sky.root)

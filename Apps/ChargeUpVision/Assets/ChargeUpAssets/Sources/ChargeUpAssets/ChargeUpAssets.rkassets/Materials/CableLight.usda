@@ -1,0 +1,139 @@
+#usda 1.0
+(
+    defaultPrim = "Root"
+    metersPerUnit = 1
+    upAxis = "Y"
+)
+
+def Xform "Root"
+{
+    // A tube of light. UV u runs along the cable from the port (0) to the
+    // lantern (1); `lit` is how far along it is lit; `edge` softens the front.
+    // `halo` = 1 makes the wide translucent halo variant (soft radially via v).
+    def Material "CableLight"
+    {
+        color3f inputs:color = (1, 0.702, 0.278)
+        float inputs:intensity = 3
+        float inputs:lit = 0
+        float inputs:edge = 0.06
+        float inputs:baseOpacity = 1
+        float inputs:halo = 0
+        token outputs:mtlx:surface.connect = </Root/CableLight/Surface.outputs:out>
+        token outputs:realitykit:vertex
+
+        def Shader "TexCoord"
+        {
+            uniform token info:id = "ND_texcoord_vector2"
+            int inputs:index = 0
+            float2 outputs:out
+        }
+
+        def Shader "Separate"
+        {
+            uniform token info:id = "ND_separate2_vector2"
+            float2 inputs:in.connect = </Root/CableLight/TexCoord.outputs:out>
+            float outputs:outx
+            float outputs:outy
+        }
+
+        def Shader "LitLow"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1.connect = </Root/CableLight.inputs:lit>
+            float inputs:in2.connect = </Root/CableLight.inputs:edge>
+            float outputs:out
+        }
+
+        def Shader "AlongStep"
+        {
+            uniform token info:id = "ND_smoothstep_float"
+            float inputs:in.connect = </Root/CableLight/Separate.outputs:outx>
+            float inputs:low.connect = </Root/CableLight/LitLow.outputs:out>
+            float inputs:high.connect = </Root/CableLight.inputs:lit>
+            float outputs:out
+        }
+
+        def Shader "Along"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1 = 1
+            float inputs:in2.connect = </Root/CableLight/AlongStep.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "VCentred"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1.connect = </Root/CableLight/Separate.outputs:outy>
+            float inputs:in2 = 0.5
+            float outputs:out
+        }
+
+        def Shader "VAbs"
+        {
+            uniform token info:id = "ND_absval_float"
+            float inputs:in.connect = </Root/CableLight/VCentred.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "RadialStep"
+        {
+            uniform token info:id = "ND_smoothstep_float"
+            float inputs:in.connect = </Root/CableLight/VAbs.outputs:out>
+            float inputs:low = 0.0
+            float inputs:high = 0.5
+            float outputs:out
+        }
+
+        def Shader "Radial"
+        {
+            uniform token info:id = "ND_subtract_float"
+            float inputs:in1 = 1
+            float inputs:in2.connect = </Root/CableLight/RadialStep.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "RadialMix"
+        {
+            uniform token info:id = "ND_mix_float"
+            float inputs:bg = 1
+            float inputs:fg.connect = </Root/CableLight/Radial.outputs:out>
+            float inputs:mix.connect = </Root/CableLight.inputs:halo>
+            float outputs:out
+        }
+
+        def Shader "Mask"
+        {
+            uniform token info:id = "ND_multiply_float"
+            float inputs:in1.connect = </Root/CableLight/Along.outputs:out>
+            float inputs:in2.connect = </Root/CableLight/RadialMix.outputs:out>
+            float outputs:out
+        }
+
+        def Shader "Opacity"
+        {
+            uniform token info:id = "ND_multiply_float"
+            float inputs:in1.connect = </Root/CableLight/Mask.outputs:out>
+            float inputs:in2.connect = </Root/CableLight.inputs:baseOpacity>
+            float outputs:out
+        }
+
+        def Shader "Emissive"
+        {
+            uniform token info:id = "ND_multiply_color3FA"
+            color3f inputs:in1.connect = </Root/CableLight.inputs:color>
+            float inputs:in2.connect = </Root/CableLight.inputs:intensity>
+            color3f outputs:out
+        }
+
+        def Shader "Surface"
+        {
+            uniform token info:id = "ND_realitykit_unlit_surfaceshader"
+            color3f inputs:color.connect = </Root/CableLight/Emissive.outputs:out>
+            float inputs:opacity.connect = </Root/CableLight/Opacity.outputs:out>
+            bool inputs:applyPostProcessToneMap = 0
+            bool inputs:hasPremultipliedAlpha = 0
+            token outputs:out
+        }
+    }
+}

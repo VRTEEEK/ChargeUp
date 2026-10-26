@@ -15,6 +15,7 @@ final class StepVisuals {
     private var stepId = SessionMarker.idle
     private var enteredAt: TimeInterval = 0
     private var lastUpdate: TimeInterval = 0
+    private var glowPulse: Float = 0
 
     init(config: VisualsConfig, rig: PortRig, lantern: ChargeObjectEntity, flow: EnergyFlow) {
         self.config = config
@@ -51,8 +52,12 @@ final class StepVisuals {
         rig.mark.isEnabled = false
         rig.mark.components[OpacityComponent.self]?.opacity = 0
         rig.setDisc(tint: PortRig.portBlue, emissive: 2)
-        flow.setExtension(0)
+        flow.hide()
         flow.setSpark(nil)
+        rig.glow?.setVisible(false)
+        rig.glow?.setExtent(charge: 0)
+        rig.glow?.setPulse(0)
+        glowPulse = 0
         lantern.apply(.dark)
     }
 
@@ -60,6 +65,7 @@ final class StepVisuals {
     private func cream() {
         idle()
         rig.root.isEnabled = true
+        rig.glow?.setVisible(true)
         rig.disc.components[OpacityComponent.self]?.opacity = 0
         rig.setDisc(tint: PortRig.portBlue, emissive: 0.2)
     }
@@ -82,7 +88,7 @@ final class StepVisuals {
     /// Cable clicks into the port. The needle moment.
     private func connect() {
         rig.setDisc(tint: PortRig.portBlue, emissive: 3)
-        flow.setExtension(0)
+        flow.setExtension(0.001)
     }
 
     /// The first spark runs up the cable and the lantern wakes.
@@ -109,7 +115,7 @@ final class StepVisuals {
     /// Port gone, mark stays on the dressing, lantern stays lit.
     private func complete() {
         lantern.apply(.lit)
-        flow.setExtension(0)
+        flow.hide()
         rig.disc.components[OpacityComponent.self]?.opacity = 0
         rig.mark.components[OpacityComponent.self]?.opacity = 1
     }
@@ -137,8 +143,10 @@ final class StepVisuals {
                 let frac = Float((t / config.countdownPulse).truncatingRemainder(dividingBy: 1))
                 let bump = sin(frac * .pi)
                 rig.setDisc(tint: PortRig.portBlue, emissive: 2 + 8 * bump)
+                rig.glow?.setPulse(bump)
             } else {
                 rig.setDisc(tint: PortRig.portBlue, emissive: 2)
+                rig.glow?.setPulse(0)
             }
         case StepID.connect:
             flow.setExtension(Float(min(1, t / config.cableSnap)))
@@ -149,8 +157,10 @@ final class StepVisuals {
         case StepID.charge:
             lantern.apply(.charging(level: charge))
             rig.setRingFill(charge)
+            rig.glow?.setExtent(charge: charge)
         case StepID.release:
-            flow.setExtension(Float(max(0, 1 - t / config.cableRetract)))
+            let left = Float(max(0, 1 - t / config.cableRetract))
+            if left > 0 { flow.setExtension(left) } else { flow.hide() }
             let u = Float(min(1, t / config.markFade))
             rig.mark.components[OpacityComponent.self]?.opacity = u
             rig.disc.components[OpacityComponent.self]?.opacity = 1 - u
