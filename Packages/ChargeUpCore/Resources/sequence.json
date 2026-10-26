@@ -79,6 +79,10 @@
       "turnHoldS": 3.0
     },
     "accessSite": "arm",
+    "cable": {
+      "rebuildHz": 30,
+      "moveThresholdMm": 2
+    },
     "sleeve": {
       "style": "glow",
       "tile": "sleeve_tile_soft",

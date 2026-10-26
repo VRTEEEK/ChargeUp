@@ -28,10 +28,21 @@ final class EnergyFlow {
     private var phase: Float = 0
     private let speed: Float
     private let config: VisualsConfig
+    private let throttle: CableConfig
     private var lastLit: Float = -1
+    /// The curve the last built tube follows; sparks ride this between rebuilds.
+    private var points: [SIMD3<Float>] = []
+    private var builtPort = SIMD3<Float>(repeating: .nan)
+    private var builtSocket = SIMD3<Float>(repeating: .nan)
+    private var builtAt: TimeInterval = -1
+    /// Rebuild counter and the time it was last reset, for the operator window.
+    private var rebuildCount = 0
+    private var countSince: TimeInterval = 0
+    private(set) var rebuildsPerSecond: Double = 0
 
-    init(config: VisualsConfig, assets: AssetCatalog? = nil) {
+    init(config: VisualsConfig, cable: CableConfig, assets: AssetCatalog? = nil) {
         self.config = config
+        self.throttle = cable
         speed = Float(config.flowSpeedMps)
         let rgb = config.cableRGB
         let color = UIColor(red: CGFloat(rgb.x), green: CGFloat(rgb.y), blue: CGFloat(rgb.z), alpha: 1)
@@ -126,7 +137,7 @@ final class EnergyFlow {
         sparkProgress = progress
     }
 
-    func update(socket: SIMD3<Float>, port: SIMD3<Float>, flowing: Bool, showPackets: Bool, dt: Float) {
+    func update(socket: SIMD3<Float>, port: SIMD3<Float>, flowing: Bool, showPackets: Bool, dt: Float, now: TimeInterval) {
         let length = simd_length(socket - port)
         guard visible, length > 0.01 else {
             core.isEnabled = false
@@ -136,17 +147,35 @@ final class EnergyFlow {
             for p in packets { p.isEnabled = false }
             return
         }
-        let points = CableMesh.catenaryPoints(from: port, to: socket, sag: config.cableSag, segments: Self.segments)
-        if let coreMesh = CableMesh.tube(along: points, radius: config.cableCore / 2),
-           let haloMesh = CableMesh.tube(along: points, radius: config.cableHalo / 2) {
-            core.model?.mesh = coreMesh
-            halo.model?.mesh = haloMesh
+        // Rebuild the tube only when an endpoint moved past the threshold or
+        // the lit value changed, and never faster than config.cable.rebuildHz.
+        let litChanged = extension_ != lastLit
+        let moved = builtPort.x.isNaN
+            || simd_length(port - builtPort) > throttle.moveThreshold
+            || simd_length(socket - builtSocket) > throttle.moveThreshold
+        if (moved || litChanged) && now - builtAt >= throttle.minInterval {
+            points = CableMesh.catenaryPoints(from: port, to: socket, sag: config.cableSag, segments: Self.segments)
+            if let coreMesh = CableMesh.tube(along: points, radius: config.cableCore / 2),
+               let haloMesh = CableMesh.tube(along: points, radius: config.cableHalo / 2) {
+                core.model?.mesh = coreMesh
+                halo.model?.mesh = haloMesh
+            }
+            builtPort = port
+            builtSocket = socket
+            builtAt = now
+            rebuildCount += 1
+            if litChanged {
+                lastLit = extension_
+                if var m = coreMaterial { try? m.setParameter(name: "lit", value: .float(extension_)); coreMaterial = m; core.model?.materials = [m] }
+                if var m = haloMaterial { try? m.setParameter(name: "lit", value: .float(extension_)); haloMaterial = m; halo.model?.materials = [m] }
+            }
         }
-        if extension_ != lastLit {
-            lastLit = extension_
-            if var m = coreMaterial { try? m.setParameter(name: "lit", value: .float(extension_)); coreMaterial = m; core.model?.materials = [m] }
-            if var m = haloMaterial { try? m.setParameter(name: "lit", value: .float(extension_)); haloMaterial = m; halo.model?.materials = [m] }
+        if now - countSince >= 1 {
+            rebuildsPerSecond = Double(rebuildCount) / max(0.001, now - countSince)
+            rebuildCount = 0
+            countSince = now
         }
+        guard points.count >= 2 else { return }
         core.isEnabled = true
         halo.isEnabled = true
         plug.isEnabled = true

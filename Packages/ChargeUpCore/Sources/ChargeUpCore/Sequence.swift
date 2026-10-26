@@ -246,6 +246,17 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     public var bobAmplitude: Float { Float(bobAmplitudeM) }
 }
 
+/// How often the cable's tube mesh may be regenerated.
+public struct CableConfig: Codable, Equatable, Sendable {
+    /// Upper bound on rebuilds per second.
+    public var rebuildHz: Double
+    /// Either endpoint moving more than this forces a rebuild (at the rate above).
+    public var moveThresholdMm: Double
+
+    public var minInterval: TimeInterval { 1 / rebuildHz }
+    public var moveThreshold: Float { Float(moveThresholdMm / 1000) }
+}
+
 public enum SleeveStyle: String, Codable, Equatable, Sendable {
     /// Placeholder tube or flat surround carrying the tile.
     case tube
@@ -428,6 +439,7 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 public struct SequenceConfig: Codable, Equatable, Sendable {
     public var companion: CompanionConfig
     public var accessSite: AccessSite
+    public var cable: CableConfig
     public var sleeve: SleeveConfig
     /// Keyed by asset slot name; absent means defaults.
     public var assetOverrides: [String: AssetOverride]
@@ -458,6 +470,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         companion = try c.decode(CompanionConfig.self, forKey: .companion)
         accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
+        cable = try c.decode(CableConfig.self, forKey: .cable)
         sleeve = try c.decode(SleeveConfig.self, forKey: .sleeve)
         assetOverrides = try c.decodeIfPresent([String: AssetOverride].self, forKey: .assetOverrides) ?? [:]
         chestPort = try c.decode(ChestPortConfig.self, forKey: .chestPort)
@@ -504,6 +517,10 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
               companion.turnDurationS > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .companion, in: c, debugDescription: "companion config out of range")
+        }
+        guard cable.rebuildHz > 0, cable.moveThresholdMm >= 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .cable, in: c, debugDescription: "cable config out of range")
         }
         guard (0...1).contains(sleeve.glow.tileOpacity), sleeve.glow.extentMinMm > 0,
               sleeve.glow.extentMaxMm >= sleeve.glow.extentMinMm, sleeve.glow.widthMm > 0,

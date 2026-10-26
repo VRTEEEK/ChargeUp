@@ -170,9 +170,9 @@ final class StepVisuals {
 
         if let portWorld {
             flow.update(socket: socketWorld, port: portWorld, flowing: isCharging,
-                        showPackets: stepId == StepID.charge, dt: dt)
+                        showPackets: stepId == StepID.charge, dt: dt, now: now)
         } else {
-            flow.update(socket: socketWorld, port: socketWorld, flowing: false, showPackets: false, dt: dt)
+            flow.update(socket: socketWorld, port: socketWorld, flowing: false, showPackets: false, dt: dt, now: now)
         }
     }
 

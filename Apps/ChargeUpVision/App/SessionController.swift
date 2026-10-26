@@ -182,6 +182,9 @@ final class SessionController: ObservableObject {
     @Published private(set) var sleeveStatus = "not built"
     func noteSleeve(_ status: String) { sleeveStatus = status }
 
+    @Published private(set) var cableStatus = "0/s"
+    func noteCable(_ status: String) { cableStatus = status }
+
     @Published private(set) var companionStatus = "off"
     func noteCompanion(_ status: String) { companionStatus = status }
 

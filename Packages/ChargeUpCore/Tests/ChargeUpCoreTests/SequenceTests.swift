@@ -66,6 +66,9 @@ import Testing
         let rgb = seq.config.visuals.cableRGB
         #expect(abs(rgb.x - 1) < 1e-6 && abs(rgb.y - 179.0 / 255) < 1e-6 && abs(rgb.z - 71.0 / 255) < 1e-6)
         #expect(seq.config.visuals.cableCoreMm == 6)
+        #expect(seq.config.cable.rebuildHz == 30)
+        #expect(abs(seq.config.cable.minInterval - 1.0 / 30) < 1e-9)
+        #expect(seq.config.cable.moveThreshold == 0.002)
     }
 
     @Test func companionCuesPerStepAndOffByDefault() throws {

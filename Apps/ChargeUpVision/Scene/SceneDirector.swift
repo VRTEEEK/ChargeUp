@@ -42,7 +42,7 @@ final class SceneDirector {
         lantern = ChargeObjectEntity(model: assets.model(.lanternHero))
         lantern.root.isEnabled = false
         lantern.root.addChild(sounds.lanternSource)
-        flow = EnergyFlow(config: config.visuals, assets: assets)
+        flow = EnergyFlow(config: config.visuals, cable: config.cable, assets: assets)
         visuals = StepVisuals(config: config.visuals, rig: rig, lantern: lantern, flow: flow)
         sky = LanternSky(config: config.sky, assets: assets)
         lantern.root.addChild(sky.root)
@@ -88,6 +88,8 @@ final class SceneDirector {
         let state = controller.state
         updateGlance(dt: dt)
         updateRise(now: now)
+        let rate = String(format: "%.0f/s", flow.rebuildsPerSecond)
+        if rate != controller.cableStatus { controller.noteCable(rate) }
         if let companion {
             companion.update(now: now)
             if companion.status != controller.companionStatus { controller.noteCompanion(companion.status) }
