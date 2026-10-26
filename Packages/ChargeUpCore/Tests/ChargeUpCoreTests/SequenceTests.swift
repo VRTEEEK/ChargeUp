@@ -58,6 +58,26 @@ import Testing
         #expect(throws: SequenceError.missingPrompt(StepID.flush)) { try load(json) }
     }
 
+    @Test func companionCuesPerStepAndOffByDefault() throws {
+        let seq = try ChargeSequence.shipped()
+        #expect(!seq.config.companion.enabled)
+        #expect(seq.config.companion.heightM == 0.22)
+        #expect(seq.step(id: StepID.cream)?.companion == .appear)
+        #expect(seq.step(id: StepID.countdown)?.companion == .agreeHold)
+        #expect(seq.step(id: StepID.connect)?.companion == .hold)
+        #expect(seq.step(id: StepID.charge)?.companion == .charging)
+        #expect(seq.step(id: StepID.release)?.companion == .cheerHeart)
+        #expect(seq.step(id: StepID.clean)?.companion == .idle)
+    }
+
+    @Test func unknownCompanionCueFails() throws {
+        var json = try shippedJSON()
+        var steps = json["steps"] as! [[String: Any]]
+        steps[0]["companion"] = "dance"
+        json["steps"] = steps
+        #expect(throws: DecodingError.self) { try load(json) }
+    }
+
     @Test func visualsConfigMatchesPerceivedText() throws {
         let v = try ChargeSequence.shipped().config.visuals
         #expect(v.countdownPulseCount == 3)

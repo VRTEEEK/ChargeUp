@@ -21,13 +21,26 @@ enum AssetSlot: String, CaseIterable {
     case sleeveTileSoft = "sleeve_tile_soft"
     case chargeMark = "charge_mark"
     case portMarker = "port_marker"
+    case companionModel = "companion_model"
+    case companionClipAgree = "companion_clip_agree"
+    case companionClipHeart = "companion_clip_heart"
+    case companionClipCheer = "companion_clip_cheer"
+    case companionClipSpin = "companion_clip_spin"
 
     /// PNGs are read as images; everything else is a USDZ model.
     var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark || self == .spark }
 
     /// port_ring and port_plate are alternatives, not layers: the ring is the
     /// arm's port, the plate is the chest's. The other one is never loaded.
-    func applies(to site: AccessSite) -> Bool {
+    var isCompanion: Bool {
+        switch self {
+        case .companionModel, .companionClipAgree, .companionClipHeart, .companionClipCheer, .companionClipSpin: return true
+        default: return false
+        }
+    }
+
+    func applies(to site: AccessSite, companionEnabled: Bool) -> Bool {
+        if isCompanion { return companionEnabled }
         switch self {
         case .portRing: return site == .arm
         case .portPlate: return site == .chestPort
@@ -69,13 +82,13 @@ final class AssetCatalog {
 
     /// Try every slot that applies to the access site once. Missing files are
     /// expected; a file that exists but fails to load is reported by name.
-    func load(accessSite: AccessSite) async {
+    func load(accessSite: AccessSite, companionEnabled: Bool = false) async {
         guard !loaded else { return }
         var found: [String] = []
         var broken: [String] = []
         var missing: [AssetSlot] = []
-        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite) }
-        for slot in AssetSlot.allCases where slot.applies(to: accessSite) {
+        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite, companionEnabled: companionEnabled) }
+        for slot in AssetSlot.allCases where slot.applies(to: accessSite, companionEnabled: companionEnabled) {
             if slot.isImage {
                 if let image = Self.loadImage(named: slot.rawValue) {
                     images[slot] = image
@@ -120,7 +133,8 @@ final class AssetCatalog {
         }
         placeholders = missing
         loaded = true
-        var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skipped.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
+        let skippedText = skipped.contains(where: \.isCompanion) ? "companion off, " : ""
+        var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skippedText)\(skipped.filter { !$0.isCompanion }.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
         parts.append(glass == nil ? "glass shader missing" : "glass shader ok")
         if !broken.isEmpty { parts.append("broken: " + broken.joined(separator: "; ")) }
         status = parts.joined(separator: ", ")

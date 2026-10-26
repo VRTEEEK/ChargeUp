@@ -182,9 +182,12 @@ final class SessionController: ObservableObject {
     @Published private(set) var sleeveStatus = "not built"
     func noteSleeve(_ status: String) { sleeveStatus = status }
 
+    @Published private(set) var companionStatus = "off"
+    func noteCompanion(_ status: String) { companionStatus = status }
+
     /// Called by the operator window before opening the space.
     func loadAssets() async {
-        await assets.load(accessSite: sequence.config.accessSite)
+        await assets.load(accessSite: sequence.config.accessSite, companionEnabled: sequence.config.companion.enabled)
         assetStatus = assets.status
     }
 

@@ -28,6 +28,21 @@ The ShaderGraph uses only nodes RealityKit accepts (`ND_position_vector3`, `ND_s
 
 Delivered 20 Oct 2026: `charge_mark.png`, `spark.png`, `port_marker.png` and `sleeve_tile.png`, all 1254 px square. The zip had no `sleeve_tile_soft.png`, so with the default config the app falls back to the plain tile and says so in the operator window; drop the soft file in and the default picks it up. The two RGBA sprites draw their glyph on a fraction of the canvas (spark 19 × 25 %, mark 41 × 89 %); the loader measures the opaque extent and scales the sprite plane so the glyph, not the canvas, fills the intended size. Opacity comes from a single-channel alpha mask the loader builds from the PNG, because RealityKit's opacity map reads a colour channel. The marker emblem has not been tracked on a device.
 
+## Companion (off by default)
+
+`config.companion.enabled` (false) gates a character beside the lantern. Slots, all USDZ in the `.rkassets` folder:
+
+| File name | Role |
+|---|---|
+| `companion_model.usdz` | The skinned model that is rendered. Its own first animation clip is used as Agree when `companion_clip_agree` is absent. |
+| `companion_clip_agree.usdz`, `companion_clip_heart.usdz`, `companion_clip_cheer.usdz`, `companion_clip_spin.usdz` | One baked SkelAnimation each, same mesh and skeleton. The first animation resource of each file is played on the model. Spin is loaded and unused by default. |
+
+Scaled so the character stands `config.companion.heightM` (0.22) tall with its feet on the lantern's base plane, beside the lantern on the side away from the nurse (opposite `config.forearm.heldArm`), as a child of the lantern root so it is world-anchored and never between the child and the nurse or over the access site. Behaviour is the optional `companion` field on each step row (`appear`, `idle`, `agreeHold`, `hold`, `charging`, `cheerHeart`); idle is the first frame of Agree held still plus a bob of `bobAmplitudeM` every `bobPeriodS`; during `charging` it turns a quarter toward the lantern and back every `turnEverySMin` to `turnEverySMax` seconds. No clip loops. It reacts to nothing else.
+
+How the clips work, verified in the simulator 26 Oct 2026: RealityKit plays a clip loaded from one file on the model loaded from another, because the Meshy exports share the same skeleton prim paths (`mixamorig_*` under one Armature); the loader checks this on the first foreign clip by comparing joint transforms 0.4 s in, and if nothing moved it swaps the clip's own entity into the same place and the operator window says "swap fallback". With these four files the check reported "retargeting works", so one model is rendered and the other three files only contribute their animation resource. A controller started paused never evaluates its frame, so held frames play for one tick and pause on the next.
+
+What the Meshy export limited: each file carries the whole mesh and texture set again (16 MB each, 66 MB for four), so the three clip files are mostly redundant data; there is no separate idle clip, so idle is a frozen frame of Agree; the clips' last frames are rest poses, so "freeze on the last frame" after the countdown reads as standing still; the delivered Agree file (used as the model) measures 1.7 m in RealityKit's bounds with the origin at the feet, not the 2.2 m / 0.48 m described, and the loader fits by measured bounds so this does not matter; the textures are baked (one `BakedMaterial`), so nothing in the character responds to the LanternGlass rules.
+
 ## Per-slot overrides
 
 `config.assetOverrides` in sequence.json, keyed by slot name:

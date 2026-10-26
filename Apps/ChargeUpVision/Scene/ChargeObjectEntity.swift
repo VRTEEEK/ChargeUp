@@ -51,6 +51,11 @@ final class ChargeObjectEntity {
         apply(state)
     }
 
+    /// The lantern's base plane and half width in the root frame, for things
+    /// that stand beside it.
+    var baseY: Float { modelBounds.map { -($0.max.y - $0.min.y) / 2 } ?? -(Self.bodyHeight / 2 + Self.capHeight) }
+    var halfWidth: Float { modelBounds.map { ($0.max.x - $0.min.x) / 2 } ?? (Self.bodyRadius + 0.006) }
+
     /// Where the cable leaves the lantern, in the lantern's local frame: just
     /// under the cap at the front. From the model's bounds when designed.
     var cableSocket: SIMD3<Float> {

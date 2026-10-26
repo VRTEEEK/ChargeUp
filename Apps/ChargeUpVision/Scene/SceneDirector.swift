@@ -15,6 +15,8 @@ final class SceneDirector {
     let sounds: SoundBank
     let visuals: StepVisuals
     let sky: LanternSky
+    /// Nil unless config.companion.enabled and the model slot has a file.
+    let companion: CompanionEntity?
     private var lastStepId: String?
     /// Rise animation state: start time and the slot the lantern is heading for.
     private var riseStartedAt: TimeInterval?
@@ -44,6 +46,17 @@ final class SceneDirector {
         visuals = StepVisuals(config: config.visuals, rig: rig, lantern: lantern, flow: flow)
         sky = LanternSky(config: config.sky, assets: assets)
         lantern.root.addChild(sky.root)
+        if config.companion.enabled,
+           let c = CompanionEntity(assets: assets, config: config.companion,
+                                   pulseSeconds: Double(config.visuals.countdownPulseCount) * config.visuals.countdownPulse) {
+            c.place(lanternBaseY: lantern.baseY, lanternHalfWidth: lantern.halfWidth, heldArm: config.forearm.heldArm)
+            lantern.root.addChild(c.root)
+            companion = c
+            controller.noteCompanion(c.status)
+        } else {
+            companion = nil
+            controller.noteCompanion(config.companion.enabled ? "enabled but companion_model missing" : "off")
+        }
         sky.show(controller.skySessions)
         controller.onSkyChanged = { [weak self] sessions in self?.sky.show(sessions) }
     }
@@ -75,6 +88,10 @@ final class SceneDirector {
         let state = controller.state
         updateGlance(dt: dt)
         updateRise(now: now)
+        if let companion {
+            companion.update(now: now)
+            if companion.status != controller.companionStatus { controller.noteCompanion(companion.status) }
+        }
         let socket = lantern.root.convert(position: lantern.cableSocket, to: nil)
         visuals.update(now: now, charge: Float(state.charge),
                        isCharging: state.isCharging(in: controller.sequence),
@@ -139,6 +156,17 @@ final class SceneDirector {
         case StepID.release: startRise(now: now)
         case SessionMarker.idle, StepID.cream: resetRise()
         default: break
+        }
+        if let companion {
+            if stepId == SessionMarker.idle {
+                companion.reset()
+            } else if let step = controller.currentStep {
+                if step.id != StepID.charge { companion.stopTurning() }
+                companion.enter(step.companion ?? .idle, at: now)
+            } else {
+                companion.stopTurning()
+                companion.enter(.idle, at: now)
+            }
         }
         if let step = controller.currentStep {
             sounds.play(step.audio)

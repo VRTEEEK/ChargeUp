@@ -60,6 +60,22 @@ extension Advance: Codable {
     }
 }
 
+/// What the companion character does during a step. Absent means idle.
+public enum CompanionCue: String, Codable, Equatable, Sendable {
+    /// Fade in, then one Agree clip.
+    case appear
+    /// First frame of Agree held still, plus the bob.
+    case idle
+    /// One Agree clip sped to the countdown pulses, then frozen on its last frame.
+    case agreeHold
+    /// Keep whatever frame is showing (connect: still frozen from the countdown).
+    case hold
+    /// Idle plus the slow turn toward the lantern every turnEverySMin...Max seconds.
+    case charging
+    /// One Cheer clip, then one Heart clip as the lantern rises.
+    case cheerHeart
+}
+
 /// What the phone in the child's free hand does during a step.
 public enum Haptic: String, Codable, Equatable, Sendable {
     case none, pulse, ramp
@@ -75,9 +91,12 @@ public struct Step: Codable, Equatable, Sendable, Identifiable {
     public var haptic: Haptic
     public var audio: String
     public var advance: Advance
+    /// Optional; nil means the companion idles.
+    public var companion: CompanionCue?
 
     public init(id: String, name: String, clinicalCue: String, perceived: String,
-                childAction: String, haptic: Haptic, audio: String, advance: Advance) {
+                childAction: String, haptic: Haptic, audio: String, advance: Advance,
+                companion: CompanionCue? = nil) {
         self.id = id
         self.name = name
         self.clinicalCue = clinicalCue
@@ -86,6 +105,7 @@ public struct Step: Codable, Equatable, Sendable, Identifiable {
         self.haptic = haptic
         self.audio = audio
         self.advance = advance
+        self.companion = companion
     }
 }
 
@@ -201,6 +221,29 @@ public struct ChargeConfig: Codable, Equatable, Sendable {
     public var glanceSeconds: Double
 
     public var ratePerSecond: Double { 1 / demoDurationSec }
+}
+
+/// The companion character beside the lantern. Off unless enabled.
+public struct CompanionConfig: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    /// Standing height in metres after scaling.
+    public var heightM: Double
+    /// Gap between the lantern's side and the character.
+    public var gapM: Double
+    /// Fade-in length at the appear cue.
+    public var fadeS: Double
+    /// Procedural bob while idle.
+    public var bobAmplitudeM: Double
+    public var bobPeriodS: Double
+    /// During charge: a slow turn toward the lantern at a random interval in this range.
+    public var turnEverySMin: Double
+    public var turnEverySMax: Double
+    public var turnDurationS: Double
+    public var turnHoldS: Double
+
+    public var height: Float { Float(heightM) }
+    public var gap: Float { Float(gapM) }
+    public var bobAmplitude: Float { Float(bobAmplitudeM) }
 }
 
 /// The textured replacement over the access site: a tube around the forearm
@@ -335,6 +378,7 @@ public struct LanternConfig: Codable, Equatable, Sendable {
 
 /// Tunables shared by all three apps. Every value here is read from sequence.json.
 public struct SequenceConfig: Codable, Equatable, Sendable {
+    public var companion: CompanionConfig
     public var accessSite: AccessSite
     public var sleeve: SleeveConfig
     /// Keyed by asset slot name; absent means defaults.
@@ -364,6 +408,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
 
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
+        companion = try c.decode(CompanionConfig.self, forKey: .companion)
         accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
         sleeve = try c.decode(SleeveConfig.self, forKey: .sleeve)
         assetOverrides = try c.decodeIfPresent([String: AssetOverride].self, forKey: .assetOverrides) ?? [:]
@@ -405,6 +450,12 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard charge.demoDurationSec > 0, charge.glanceDegrees > 0, charge.glanceSeconds > 0 else {
             throw DecodingError.dataCorruptedError(
                 forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
+        }
+        guard companion.heightM > 0, companion.fadeS > 0, companion.bobPeriodS > 0,
+              companion.turnEverySMin > 0, companion.turnEverySMax >= companion.turnEverySMin,
+              companion.turnDurationS > 0 else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .companion, in: c, debugDescription: "companion config out of range")
         }
         guard (0...1).contains(sleeve.opacity), sleeve.lengthMm > 0, sleeve.tileRepeat > 0,
               sleeve.surroundSizeMm.count == 2, ["sleeve_tile", "sleeve_tile_soft"].contains(sleeve.tile) else {
