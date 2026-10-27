@@ -134,6 +134,10 @@ public final class PeerChannel: ObservableObject {
         self.transport.channel = self
     }
 
+    deinit {
+        transport.stop()
+    }
+
     public func start() {
         guard !isRunning else { return }
         isRunning = true
@@ -241,23 +245,32 @@ public final class PeerChannel: ObservableObject {
 }
 
 /// Owns the MCSession and the advertiser or browser. All state lives on one
-/// serial queue; everything the channel needs to know is hopped to the main
-/// actor as plain Sendable values.
+/// serial queue. Three rules keep teardown safe:
+/// 1. No MultipeerConnectivity object (MCPeerID, MCSession, browser) is ever
+///    captured into a block that outlives the call it was received in; blocks
+///    carry display names, and peers are looked up in `session.connectedPeers`
+///    when needed. Multipeer frees its peer objects when a session goes away,
+///    and releasing a captured one afterwards crashes.
+/// 2. Every delayed job is a DispatchWorkItem that `stop()` cancels.
+/// 3. `stop()` runs synchronously on the queue, so when it returns nothing
+///    is pending and nothing will touch this object again.
 final class MultipeerTransport: NSObject, @unchecked Sendable {
     enum Mode { case host, browser }
 
     private static let logger = Logger(subsystem: "com.vrteek.chargeup", category: "peer")
     private static let reconnectDelay: TimeInterval = 1.0
     private static let inviteTimeout: TimeInterval = 15
+    private static let queueKey = DispatchSpecificKey<UInt8>()
 
-    private let queue = DispatchQueue(label: "com.vrteek.chargeup.peer")
+    private let queue: DispatchQueue
     private let mode: Mode
     private let serviceType: String
     private let myPeerID: MCPeerID
     private var session: MCSession?
     private var advertiser: MCNearbyServiceAdvertiser?
     private var browser: MCNearbyServiceBrowser?
-    private var connected: [String: MCPeerID] = [:]
+    /// Display names of connected peers. The MCPeerID objects stay with the session.
+    private var connected: Set<String> = []
     /// The one host we have invited and are waiting on. Two headsets in a
     /// room must not both be invited: Multipeer would merge the sessions into
     /// one mesh and the nurse would drive both.
@@ -267,6 +280,8 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
     /// and browse again.
     private var hostName: String?
     private var running = false
+    /// Delayed work still scheduled; cancelled by stop().
+    private var pending: [DispatchWorkItem] = []
 
     weak var channel: PeerChannel?
 
@@ -274,11 +289,39 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
         self.mode = mode
         self.serviceType = serviceType
         self.myPeerID = MCPeerID(displayName: displayName)
+        self.queue = DispatchQueue(label: "com.vrteek.chargeup.peer")
         super.init()
+        queue.setSpecific(key: Self.queueKey, value: 1)
+    }
+
+    deinit {
+        // Last reference may go on any thread; tear down on the queue.
+        onQueue { tearDown() }
+    }
+
+    /// Run `work` on the queue now: inline if already on it, else synchronously.
+    private func onQueue(_ work: () -> Void) {
+        if DispatchQueue.getSpecific(key: Self.queueKey) == 1 {
+            work()
+        } else {
+            queue.sync(execute: work)
+        }
+    }
+
+    /// Schedule cancellable delayed work on the queue. The block gets a weak
+    /// self and must capture nothing from MultipeerConnectivity.
+    private func later(_ delay: TimeInterval, _ body: @escaping @Sendable (MultipeerTransport) -> Void) {
+        let item = DispatchWorkItem { [weak self] in
+            guard let self, running else { return }
+            body(self)
+        }
+        pending.append(item)
+        pending.removeAll { $0.isCancelled }
+        queue.asyncAfter(deadline: .now() + delay, execute: item)
     }
 
     func start() {
-        queue.async { [self] in
+        onQueue {
             guard !running else { return }
             running = true
             let session = MCSession(peer: myPeerID, securityIdentity: nil, encryptionPreference: .required)
@@ -292,24 +335,33 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
     }
 
     func stop() {
-        queue.async { [self] in
-            running = false
-            advertiser?.stopAdvertisingPeer()
-            advertiser = nil
-            browser?.stopBrowsingForPeers()
-            browser = nil
-            session?.disconnect()
-            session = nil
-            connected.removeAll()
-            pendingInvite = nil
-            hostName = nil
-        }
+        onQueue { tearDown() }
+    }
+
+    /// Queue-only. Cancels every pending job and drops every Multipeer object.
+    private func tearDown() {
+        running = false
+        for item in pending { item.cancel() }
+        pending.removeAll()
+        advertiser?.delegate = nil
+        advertiser?.stopAdvertisingPeer()
+        advertiser = nil
+        browser?.delegate = nil
+        browser?.stopBrowsingForPeers()
+        browser = nil
+        session?.delegate = nil
+        session?.disconnect()
+        session = nil
+        connected.removeAll()
+        pendingInvite = nil
+        hostName = nil
     }
 
     func send(_ data: Data, to names: [String]) {
+        let wanted = Set(names)
         queue.async { [self] in
-            guard let session else { return }
-            let targets = names.compactMap { connected[$0] }
+            guard running, let session else { return }
+            let targets = session.connectedPeers.filter { wanted.contains($0.displayName) }
             guard !targets.isEmpty else { return }
             do {
                 try session.send(data, toPeers: targets, with: .reliable)
@@ -322,12 +374,11 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
     // MARK: Queue-only helpers
 
     private func startAdvertising() {
-        guard running, let session else { return }
+        guard running, session != nil else { return }
         let advertiser = MCNearbyServiceAdvertiser(peer: myPeerID, discoveryInfo: nil, serviceType: serviceType)
         advertiser.delegate = self
         self.advertiser = advertiser
         advertiser.startAdvertisingPeer()
-        _ = session
         notify("advertising \(serviceType)")
     }
 
@@ -335,6 +386,7 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
         guard running else { return }
         pendingInvite = nil
         if connected.isEmpty { hostName = nil }
+        browser?.delegate = nil
         browser?.stopBrowsingForPeers()
         let browser = MCNearbyServiceBrowser(peer: myPeerID, serviceType: serviceType)
         browser.delegate = self
@@ -345,9 +397,9 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
 
     private func scheduleRebrowse() {
         guard mode == .browser else { return }
-        queue.asyncAfter(deadline: .now() + Self.reconnectDelay) { [weak self] in
-            guard let self, running, connected.isEmpty else { return }
-            startBrowsing()
+        later(Self.reconnectDelay) { t in
+            guard t.connected.isEmpty else { return }
+            t.startBrowsing()
         }
     }
 
@@ -359,23 +411,27 @@ final class MultipeerTransport: NSObject, @unchecked Sendable {
 
 extension MultipeerTransport: MCSessionDelegate {
     func session(_ session: MCSession, peer peerID: MCPeerID, didChange state: MCSessionState) {
+        // Only Sendable values cross into the queue: never the peer object.
         let name = peerID.displayName
+        let rawState = state.rawValue
         queue.async { [self] in
-            switch state {
+            guard running, self.session === session else { return }
+            switch MCSessionState(rawValue: rawState) ?? .notConnected {
             case .connected:
-                connected[name] = peerID
+                connected.insert(name)
                 if pendingInvite == name { pendingInvite = nil }
                 Task { @MainActor [weak channel] in channel?.transportPeerConnected(name) }
             case .notConnected:
                 if pendingInvite == name { pendingInvite = nil }
-                let wasConnected = connected.removeValue(forKey: name) != nil
+                let wasConnected = connected.remove(name) != nil
                 Task { @MainActor [weak channel] in channel?.transportPeerDisconnected(name) }
                 if mode == .browser, name == hostName {
                     // The headset is gone: leave the mesh so we can find it (or another) again.
                     hostName = nil
-                    let others = Array(connected.keys)
+                    let others = Array(connected)
                     connected.removeAll()
-                    session.disconnect()
+                    self.session?.delegate = nil
+                    self.session?.disconnect()
                     let fresh = MCSession(peer: myPeerID, securityIdentity: nil, encryptionPreference: .required)
                     fresh.delegate = self
                     self.session = fresh
@@ -407,29 +463,33 @@ extension MultipeerTransport: MCSessionDelegate {
 extension MultipeerTransport: MCNearbyServiceAdvertiserDelegate {
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID,
                     withContext context: Data?, invitationHandler: @escaping (Bool, MCSession?) -> Void) {
-        // Accept everyone; roles are declared in the hello message.
-        queue.sync { invitationHandler(running, session) }
+        // Accept everyone; roles are declared in the hello message. Answered
+        // inline so the handler block is not kept.
+        onQueue { invitationHandler(running, session) }
     }
 
     func advertiser(_ advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: Error) {
         notify("advertising failed: \(error.localizedDescription)")
-        queue.asyncAfter(deadline: .now() + Self.reconnectDelay) { [weak self] in self?.startAdvertising() }
+        onQueue { later(Self.reconnectDelay) { t in t.startAdvertising() } }
     }
 }
 
 extension MultipeerTransport: MCNearbyServiceBrowserDelegate {
     func browser(_ browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String: String]?) {
-        queue.async { [self] in
-            guard running, let session, connected.isEmpty, pendingInvite == nil else { return }
-            pendingInvite = peerID.displayName
-            hostName = peerID.displayName
-            notify("found \(peerID.displayName), inviting")
+        // The invite uses the peer object, so it happens inside this call;
+        // only the name goes into the timeout job.
+        let name = peerID.displayName
+        onQueue {
+            guard running, let session, self.browser === browser, connected.isEmpty, pendingInvite == nil else { return }
+            pendingInvite = name
+            hostName = name
+            notify("found \(name), inviting")
             browser.invitePeer(peerID, to: session, withContext: nil, timeout: Self.inviteTimeout)
             // If the invitation neither connects nor fails, free the slot after the timeout.
-            queue.asyncAfter(deadline: .now() + Self.inviteTimeout + 1) { [weak self] in
-                guard let self, pendingInvite == peerID.displayName, connected.isEmpty else { return }
-                pendingInvite = nil
-                startBrowsing()
+            later(Self.inviteTimeout + 1) { t in
+                guard t.pendingInvite == name, t.connected.isEmpty else { return }
+                t.pendingInvite = nil
+                t.startBrowsing()
             }
         }
     }
@@ -440,6 +500,6 @@ extension MultipeerTransport: MCNearbyServiceBrowserDelegate {
 
     func browser(_ browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: Error) {
         notify("browsing failed: \(error.localizedDescription)")
-        queue.asyncAfter(deadline: .now() + Self.reconnectDelay) { [weak self] in self?.startBrowsing() }
+        onQueue { later(Self.reconnectDelay) { t in t.startBrowsing() } }
     }
 }

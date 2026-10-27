@@ -37,3 +37,32 @@ The long idle lead-in is in the raw file because the first attempts to flip the 
 ## Not in these files
 
 Audio (the simulator renders the spatial sources but the capture has no audio track worth keeping), haptics, hand tracking, passthrough. The operator panel is visible in the headset capture because the simulator shows the operator window in the same frame as the immersive space; on the device the child does not see it.
+
+---
+
+# Companion recording, 27 Oct 2026
+
+`headset-rehearsal-companion-child-view.mov`: Apple Vision Pro simulator (visionOS 2.3), 2732 × 2048 H.264, 95.7 s, uncut. The child's view through one rehearsal-mode session with the companion flag on, from before cream to complete.
+
+## Exact configuration
+
+- Code: the commit this file arrived in (PeerChannel teardown fix). `config.companion.enabled` was `true` for the run and is committed `false`.
+- `config.rehearsalIntervalMs` was set to 12000 for the run so one session spans the recording (7 steps × 12 s); committed value is 3000. The iPad companion app was rebuilt with 12000 for this; the headset does not read that key.
+- `config.accessSite` arm, simulated forearm, glow sleeve, real lantern and ring, amber cable, sky seeded to 6 at app launch and at 9 by this take (the driver had looped twice before the recorder started).
+- Driven by the iPad simulator's Rehearsal toggle over Multipeer between the two simulators; headset launched with `CHARGEUP_AUTOSTART=1`, no file control.
+
+## Timeline inside the file (from the headset's channel log)
+
+| Offset | Event |
+|---|---|
+| 0 to 9 s | end of the previous session (complete), lantern lit in the sky |
+| 9 s | reset to idle; companion fades out |
+| 21 s | cream: glow appears on the port, companion fades in and waves |
+| 33 s | clean: frost sparkles |
+| 45 s | countdown: three pulses, companion listens |
+| 57 s | CONNECT: cable appears and lights toward the lantern; flush follows at 58 s with the spark |
+| 69 s | charge: packets on the cable, lantern filling, companion idling |
+| 81 s | release: cable retracts, companion heart then cheer, lantern rises into the sky |
+| 93 s | complete |
+
+Not in the file: audio, haptics, hand tracking, passthrough. The operator panel is visible in the simulator frame; on the device the child does not see it.
