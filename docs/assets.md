@@ -36,18 +36,25 @@ The cable is `Materials/CableLight.usda` on a tube mesh rebuilt each frame along
 
 ## Companion (off by default)
 
-`config.companion.enabled` (false) gates a character beside the lantern. Slots, all USDZ in the `.rkassets` folder:
+`config.companion.enabled` (false) gates a character beside the lantern. Slots, all USDZ in the `.rkassets` folder; only the ones the sequence references are loaded:
 
-| File name | Role |
-|---|---|
-| `companion_model.usdz` | The skinned model that is rendered. Its own first animation clip is used as Agree when `companion_clip_agree` is absent. |
-| `companion_clip_agree.usdz`, `companion_clip_heart.usdz`, `companion_clip_cheer.usdz`, `companion_clip_spin.usdz` | One baked SkelAnimation each, same mesh and skeleton. The first animation resource of each file is played on the model. Spin is loaded and unused by default. |
+| File name | Clip inside | Length | Used by |
+|---|---|---|---|
+| `companion_model.usdz` | Idle_3, breathing idle | 10 s | the rendered model; its own clip is the idle loop |
+| `companion_clip_wave.usdz` | Wave_for_Help_2 | 1.5 s | cream (`waveIn`), at 0.8 |
+| `companion_clip_listen.usdz` | Listening_Gesture | 9.3 s | countdown and connect (`listen`) |
+| `companion_clip_look.usdz` | Short_Breathe_and_Look_Around | 7.8 s | flush (`lookOnce`); charge variety |
+| `companion_clip_sway.usdz` | Happy_Sway_Standing | 10 s | charge variety, at 0.6 |
+| `companion_clip_idle_alt.usdz` | Idle_02 | 1.9 s | charge variety |
+| `companion_clip_fidget.usdz` | Idle_03 | 4.3 s | charge variety only if listed in `chargeVariety`; at most `fidgetMaxPerSession` (1) times |
+| `companion_clip_heart.usdz` | Big_Heart_Gesture | 6 s | release (`heartCheer`), first |
+| `companion_clip_cheer.usdz` | Cheer_with_Both_Hands | 3 s | release (`heartCheer`), second, at 0.8 |
 
-Scaled so the character stands `config.companion.heightM` (0.22) tall with its feet on the lantern's base plane, beside the lantern on the side away from the nurse (opposite `config.forearm.heldArm`), as a child of the lantern root so it is world-anchored and never between the child and the nurse or over the access site. Behaviour is the optional `companion` field on each step row (`appear`, `idle`, `agreeHold`, `hold`, `charging`, `cheerHeart`); idle is the first frame of Agree held still plus a bob of `bobAmplitudeM` every `bobPeriodS`; during `charging` it turns a quarter toward the lantern and back every `turnEverySMin` to `turnEverySMax` seconds. No clip loops. It reacts to nothing else.
+Agree and Spin are no longer referenced and are not in the package. The clip files carry placeholder textures and are only read for their animation resource.
 
-How the clips work, verified in the simulator 26 Oct 2026: RealityKit plays a clip loaded from one file on the model loaded from another, because the Meshy exports share the same skeleton prim paths (`mixamorig_*` under one Armature); the loader checks this on the first foreign clip by comparing joint transforms 0.4 s in, and if nothing moved it swaps the clip's own entity into the same place and the operator window says "swap fallback". With these four files the check reported "retargeting works", so one model is rendered and the other three files only contribute their animation resource. A controller started paused never evaluates its frame, so held frames play for one tick and pause on the next.
+Rules: idle is a real loop of the model's own clip and is the one clip that loops. Every other clip plays once at `config.companion.speed` (0.7) or its entry in `speedOverrides`; every change, including into idle, cross-fades over `crossfadeS` (0.3) using the playback transition. Cues per step row (`companion` field): `waveIn` fades in over `fadeS`, waves once, idles; `idle`; `listen` runs the listen clip and keeps it running across following steps that also say listen; `lookOnce` looks around once, then idles; `charging` idles and every `chargeVarietyEverySMin` to `Max` (25 to 40) seconds plays one of `chargeVariety` (look, sway, idleAlt) chosen at random without repeating the last, then idles; `heartCheer` plays heart once as the lantern lights, then cheer once as it rises. Placement is unchanged: `heightM` tall, feet on the lantern's base plane, beside it on the side opposite `config.forearm.heldArm`, world-anchored with the lantern. No reaction to presence or charge pauses, no sound, nothing on the companions.
 
-What the Meshy export limited: each file carries the whole mesh and texture set again (16 MB each, 66 MB for four), so the three clip files are mostly redundant data; there is no separate idle clip, so idle is a frozen frame of Agree; the clips' last frames are rest poses, so "freeze on the last frame" after the countdown reads as standing still; the delivered Agree file (used as the model) measures 1.7 m in RealityKit's bounds with the origin at the feet, not the 2.2 m / 0.48 m described, and the loader fits by measured bounds so this does not matter; the textures are baked (one `BakedMaterial`), so nothing in the character responds to the LanternGlass rules.
+Clips from other files play on the model by retargeting (verified 27 Oct 2026: probe reported "retargeting works" on the first foreign clip); the entity-swap fallback remains and reports in the operator window if a clip ever moves nothing. Every clip starts and ends on the same pose, which is what makes the cross-fades clean.
 
 ## Per-slot overrides
 

@@ -47,8 +47,7 @@ final class SceneDirector {
         sky = LanternSky(config: config.sky, assets: assets)
         lantern.root.addChild(sky.root)
         if config.companion.enabled,
-           let c = CompanionEntity(assets: assets, config: config.companion,
-                                   pulseSeconds: Double(config.visuals.countdownPulseCount) * config.visuals.countdownPulse) {
+           let c = CompanionEntity(assets: assets, config: config.companion) {
             c.place(lanternBaseY: lantern.baseY, lanternHalfWidth: lantern.halfWidth, heldArm: config.forearm.heldArm)
             lantern.root.addChild(c.root)
             companion = c
@@ -163,10 +162,10 @@ final class SceneDirector {
             if stepId == SessionMarker.idle {
                 companion.reset()
             } else if let step = controller.currentStep {
-                if step.id != StepID.charge { companion.stopTurning() }
+                if step.id != StepID.charge { companion.stopVariety() }
                 companion.enter(step.companion ?? .idle, at: now)
             } else {
-                companion.stopTurning()
+                companion.stopVariety()
                 companion.enter(.idle, at: now)
             }
         }

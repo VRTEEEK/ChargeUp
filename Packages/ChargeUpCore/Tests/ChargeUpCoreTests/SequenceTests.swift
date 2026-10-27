@@ -75,12 +75,19 @@ import Testing
         let seq = try ChargeSequence.shipped()
         #expect(!seq.config.companion.enabled)
         #expect(seq.config.companion.heightM == 0.22)
-        #expect(seq.step(id: StepID.cream)?.companion == .appear)
-        #expect(seq.step(id: StepID.countdown)?.companion == .agreeHold)
-        #expect(seq.step(id: StepID.connect)?.companion == .hold)
+        #expect(seq.step(id: StepID.cream)?.companion == .waveIn)
+        #expect(seq.step(id: StepID.countdown)?.companion == .listen)
+        #expect(seq.step(id: StepID.connect)?.companion == .listen)
+        #expect(seq.step(id: StepID.flush)?.companion == .lookOnce)
         #expect(seq.step(id: StepID.charge)?.companion == .charging)
-        #expect(seq.step(id: StepID.release)?.companion == .cheerHeart)
+        #expect(seq.step(id: StepID.release)?.companion == .heartCheer)
         #expect(seq.step(id: StepID.clean)?.companion == .idle)
+        #expect(seq.config.companion.speed == 0.7)
+        #expect(seq.config.companion.speed(for: "wave") == 0.8)
+        #expect(seq.config.companion.speed(for: "listen") == 0.7)
+        #expect(seq.config.companion.crossfadeS == 0.3)
+        #expect(seq.config.companion.chargeVariety == ["look", "sway", "idleAlt"])
+        #expect(seq.config.companion.fidgetMaxPerSession == 1)
     }
 
     @Test func unknownCompanionCueFails() throws {

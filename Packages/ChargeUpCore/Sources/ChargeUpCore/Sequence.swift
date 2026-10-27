@@ -62,18 +62,18 @@ extension Advance: Codable {
 
 /// What the companion character does during a step. Absent means idle.
 public enum CompanionCue: String, Codable, Equatable, Sendable {
-    /// Fade in, then one Agree clip.
-    case appear
-    /// First frame of Agree held still, plus the bob.
+    /// Fade in, wave once, then idle.
+    case waveIn
+    /// The breathing idle loop.
     case idle
-    /// One Agree clip sped to the countdown pulses, then frozen on its last frame.
-    case agreeHold
-    /// Keep whatever frame is showing (connect: still frozen from the countdown).
-    case hold
-    /// Idle plus the slow turn toward the lantern every turnEverySMin...Max seconds.
+    /// Listen, kept running across following steps that also say listen.
+    case listen
+    /// Look around once, then idle.
+    case lookOnce
+    /// Idle with an occasional variety clip (config.companion.chargeVariety).
     case charging
-    /// One Cheer clip, then one Heart clip as the lantern rises.
-    case cheerHeart
+    /// Heart once as the lantern lights, then cheer once as it rises.
+    case heartCheer
 }
 
 /// What the phone in the child's free hand does during a step.
@@ -230,20 +230,25 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     public var heightM: Double
     /// Gap between the lantern's side and the character.
     public var gapM: Double
-    /// Fade-in length at the appear cue.
+    /// Fade-in length at the waveIn cue.
     public var fadeS: Double
-    /// Procedural bob while idle.
-    public var bobAmplitudeM: Double
-    public var bobPeriodS: Double
-    /// During charge: a slow turn toward the lantern at a random interval in this range.
-    public var turnEverySMin: Double
-    public var turnEverySMax: Double
-    public var turnDurationS: Double
-    public var turnHoldS: Double
+    /// Playback speed for every clip unless overridden.
+    public var speed: Double
+    /// Transition length between any two clips, including into idle.
+    public var crossfadeS: Double
+    /// Per-clip speed, keyed by clip name (wave, sway, cheer, ...).
+    public var speedOverrides: [String: Double]
+    /// During charge: one variety clip at a random interval in this range.
+    public var chargeVarietyEverySMin: Double
+    public var chargeVarietyEverySMax: Double
+    /// Clip names drawn from, never repeating the last.
+    public var chargeVariety: [String]
+    /// The fidget clip plays at most this many times per session.
+    public var fidgetMaxPerSession: Int
 
     public var height: Float { Float(heightM) }
     public var gap: Float { Float(gapM) }
-    public var bobAmplitude: Float { Float(bobAmplitudeM) }
+    public func speed(for clip: String) -> Double { speedOverrides[clip] ?? speed }
 }
 
 /// How often the cable's tube mesh may be regenerated.
@@ -512,9 +517,11 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
         }
-        guard companion.heightM > 0, companion.fadeS > 0, companion.bobPeriodS > 0,
-              companion.turnEverySMin > 0, companion.turnEverySMax >= companion.turnEverySMin,
-              companion.turnDurationS > 0 else {
+        guard companion.heightM > 0, companion.fadeS > 0, companion.speed > 0, companion.crossfadeS >= 0,
+              companion.chargeVarietyEverySMin > 0,
+              companion.chargeVarietyEverySMax >= companion.chargeVarietyEverySMin,
+              !companion.chargeVariety.isEmpty, companion.fidgetMaxPerSession >= 0,
+              companion.speedOverrides.values.allSatisfy({ $0 > 0 }) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .companion, in: c, debugDescription: "companion config out of range")
         }

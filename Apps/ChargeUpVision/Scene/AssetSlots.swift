@@ -22,10 +22,14 @@ enum AssetSlot: String, CaseIterable {
     case chargeMark = "charge_mark"
     case portMarker = "port_marker"
     case companionModel = "companion_model"
-    case companionClipAgree = "companion_clip_agree"
+    case companionClipIdleAlt = "companion_clip_idle_alt"
+    case companionClipWave = "companion_clip_wave"
+    case companionClipListen = "companion_clip_listen"
+    case companionClipLook = "companion_clip_look"
+    case companionClipSway = "companion_clip_sway"
+    case companionClipFidget = "companion_clip_fidget"
     case companionClipHeart = "companion_clip_heart"
     case companionClipCheer = "companion_clip_cheer"
-    case companionClipSpin = "companion_clip_spin"
 
     /// PNGs are read as images; everything else is a USDZ model.
     var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark || self == .spark }
@@ -34,7 +38,8 @@ enum AssetSlot: String, CaseIterable {
     /// arm's port, the plate is the chest's. The other one is never loaded.
     var isCompanion: Bool {
         switch self {
-        case .companionModel, .companionClipAgree, .companionClipHeart, .companionClipCheer, .companionClipSpin: return true
+        case .companionModel, .companionClipIdleAlt, .companionClipWave, .companionClipListen, .companionClipLook,
+             .companionClipSway, .companionClipFidget, .companionClipHeart, .companionClipCheer: return true
         default: return false
         }
     }
