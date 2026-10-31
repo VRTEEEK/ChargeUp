@@ -4,7 +4,9 @@ import QuartzCore
 import ChargeUpCore
 
 /// The child's view. No UI lives here; the operator window carries all
-/// text and status. Everything visible is owned by SceneDirector.
+/// text and status. Everything visible is owned by SceneDirector. The one
+/// gesture is the system's look and pinch, on the hung lanterns (all the
+/// time, config.tree.touch) and on the monkey (config.companion.touch).
 struct ImmersiveView: View {
     static let id = "charge"
 
@@ -22,6 +24,9 @@ struct ImmersiveView: View {
                 director.frame(now: CACurrentMediaTime())
             }
         }
+        .gesture(SpatialTapGesture().targetedToAnyEntity().onEnded { value in
+            director?.pinch(value.entity)
+        })
         .task {
             await controller.portSource.start()
             await controller.headPose.start()

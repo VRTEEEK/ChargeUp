@@ -16,10 +16,14 @@ protocol PortPoseSource: AnyObject {
     /// World positions of the hands' fingertips and knuckles, for touching
     /// things in the scene. Empty where there are no tracked hands.
     func touchPoints(now: TimeInterval) -> [SIMD3<Float>]
+    /// Each tracked hand's centre (its middle knuckle) in world space, keyed
+    /// 0 left and 1 right, for recognising a wave. Empty without hands.
+    func handCentres(now: TimeInterval) -> [Int: SIMD3<Float>]
 }
 
 extension PortPoseSource {
     func touchPoints(now: TimeInterval) -> [SIMD3<Float>] { [] }
+    func handCentres(now: TimeInterval) -> [Int: SIMD3<Float>] { [:] }
 }
 
 extension ForearmAnchor: PortPoseSource {

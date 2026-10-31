@@ -1,48 +1,52 @@
 import simd
 
-/// The cable from the port to the lantern socket: a straight span with a
-/// parabolic sag straight down, zero at both ends and `sag` at mid-span.
-/// Evaluated analytically, so anything riding the cable (sparks, the plug)
-/// can follow the current endpoints every frame while the tube mesh is
-/// rebuilt on its own throttle.
-public struct CableCurve: Equatable, Sendable {
-    public var start: SIMD3<Float>
-    public var end: SIMD3<Float>
-    public var sag: Float
+/// The energy stream's path: a cubic Bezier from the port to the lantern's
+/// glass. It leaves the port straight out of its glass (along the port's
+/// up), arcs over, and enters the glass level from the port's side, through
+/// the open cage, so the energy looks as if it flows out of one jewel into
+/// the other. Built from the current endpoints every frame; anything that
+/// rides it follows the arm and the lantern without lag.
+public struct EnergyPath: Equatable, Sendable {
+    public let p0: SIMD3<Float>, p1: SIMD3<Float>, p2: SIMD3<Float>, p3: SIMD3<Float>
 
-    public init(from start: SIMD3<Float>, to end: SIMD3<Float>, sag: Float) {
-        self.start = start
-        self.end = end
-        self.sag = sag
+    /// `bend` is each control arm's length as a fraction of the span.
+    public init(port: SIMD3<Float>, portUp: SIMD3<Float>, target: SIMD3<Float>, bend: Float) {
+        let span = simd_length(target - port)
+        let up = simd_length(portUp) > 1e-6 ? simd_normalize(portUp) : SIMD3<Float>(0, 1, 0)
+        var toPort = port - target
+        toPort.y = 0
+        let entry = simd_length(toPort) > 1e-6 ? simd_normalize(toPort) : -up
+        p0 = port
+        p1 = port + up * bend * span
+        p2 = target + entry * bend * span
+        p3 = target
     }
 
-    /// Point at t in 0...1 (clamped). 0 is the port, 1 the lantern socket.
-    public func point(at t: Float) -> SIMD3<Float> {
-        let t = max(0, min(1, t))
-        var p = start + (end - start) * t
-        p.y -= sag * 4 * t * (1 - t)
-        return p
+    /// Point at u in 0...1 (clamped): 0 the port, 1 the lantern's glass.
+    public func point(at u: Float) -> SIMD3<Float> {
+        let t = max(0, min(1, u)), s = 1 - t
+        return s * s * s * p0 + 3 * s * s * t * p1 + 3 * s * t * t * p2 + t * t * t * p3
     }
 
-    /// Unit tangent at t, pointing from the port toward the socket.
-    public func tangent(at t: Float) -> SIMD3<Float> {
-        let t = max(0, min(1, t))
-        var d = end - start
-        d.y -= sag * 4 * (1 - 2 * t)
+    /// Unit tangent at u, pointing toward the lantern.
+    public func tangent(at u: Float) -> SIMD3<Float> {
+        let t = max(0, min(1, u)), s = 1 - t
+        let d = 3 * s * s * (p1 - p0) + 6 * s * t * (p2 - p1) + 3 * t * t * (p3 - p2)
         let l = simd_length(d)
-        return l > 1e-6 ? d / l : SIMD3(0, 1, 0)
+        return l > 1e-7 ? d / l : simd_normalize(p3 - p0 + SIMD3(0, 1e-6, 0))
     }
 
-    /// `segments + 1` evenly spaced samples, ends included.
+    /// `segments + 1` samples by parameter, ends included.
     public func samples(segments: Int) -> [SIMD3<Float>] {
         let n = max(1, segments)
         return (0...n).map { point(at: Float($0) / Float(n)) }
     }
 
-    /// Opacity of a spark at t: ramps 0 to 1 over the first `fade` of the
-    /// cable and 1 to 0 over the last `fade`, 1 between. `fade` 0 means none.
-    public static func sparkOpacity(at t: Float, fade: Float) -> Float {
-        let t = max(0, min(1, t))
+    /// Opacity of something riding the path at u: ramps 0 to 1 over the
+    /// first `fade` and 1 to 0 over the last `fade`, so nothing pops in at
+    /// the port or out at the lantern. `fade` 0 means none.
+    public static func fade(at u: Float, fade: Float) -> Float {
+        let t = max(0, min(1, u))
         guard fade > 0 else { return 1 }
         return max(0, min(1, min(t / fade, (1 - t) / fade)))
     }

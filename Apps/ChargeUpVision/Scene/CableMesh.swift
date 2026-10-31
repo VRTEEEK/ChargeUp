@@ -2,7 +2,7 @@ import Foundation
 import RealityKit
 import ChargeUpCore
 
-/// A tube along a sampled `CableCurve`, with UV u along the cable (0 at
+/// A tube along a sampled `EnergyPath`, with UV u along the stream (0 at
 /// the port) and v around it. The rings sit on rotation-minimising frames
 /// (`TransportFrames`), so the tube cannot twist where the cable runs
 /// vertical. Rebuilt on the cable throttle, not every frame.

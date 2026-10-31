@@ -245,6 +245,18 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     public var chargeVariety: [String]
     /// The fidget clip plays at most this many times per session.
     public var fidgetMaxPerSession: Int
+    /// Waving back at the child, and playing when touched (Wave.swift).
+    public var wave: CompanionWaveConfig
+    public var touch: CompanionTouchConfig
+    /// Its voice: for a clip named here, one of these sounds (Audio/Sounds,
+    /// without .wav) plays from its head as the clip starts, taking turns.
+    /// Clips not named are silent, so it never chatters while the child
+    /// rests through the infusion, nor on the countdown.
+    public var voices: [String: [String]]
+    public var voiceGainDb: Double
+
+    /// Every voice sound, for loading.
+    public var voiceIds: [String] { Array(Set(voices.values.flatMap { $0 })).sorted() }
 
     public var height: Float { Float(heightM) }
     public var gap: Float { Float(gapM) }
@@ -267,6 +279,8 @@ public enum SleeveStyle: String, Codable, Equatable, Sendable {
     case tube
     /// Soft radial glow at the port, growing along the forearm with the charge.
     case glow
+    /// Nothing on the skin around the port: the port alone, as a jewel.
+    case none
 }
 
 /// The glow style's numbers.
@@ -365,30 +379,85 @@ public struct VisualsConfig: Codable, Equatable, Sendable {
     public var cableRetractMs: Int
     /// release: the mark fades onto the dressing over this long.
     public var markFadeMs: Int
-    /// charge: energy packets along the cable, and their speed while flowing
-    /// as a fraction of the cable's length per second, so a jittering arm
-    /// that stretches or shortens the cable does not change their pace.
-    public var flowPacketCount: Int
+    /// The energy stream's pace while flowing, as a fraction of the path per
+    /// second, so a jittering arm that stretches or shortens the path does
+    /// not change it.
     public var flowCableFractionPerSecond: Double
-    /// Each spark fades in over this first fraction of the cable and out over
-    /// the same last fraction, so none pops at either end.
+    /// Each firefly fades in over this first fraction of the path and out
+    /// over the same last fraction, so none pops at either end.
     public var flowFadeFraction: Double
+    /// The energy stream (EnergyPath, FireflySwarm): golden fireflies flowing
+    /// along a cubic Bezier from the port's glass into the lantern's glass,
+    /// over a very thin, faint amber core that breathes.
+    /// Each control arm of the path as a fraction of its span.
+    public var streamBend: Double
+    /// The stream leaves the port this far above the skin, out of the glass.
+    public var streamPortLiftMm: Double
+    /// The core: diameter, opacity, and a slow breathing of that opacity.
+    public var streamCoreMm: Double
+    public var streamCoreOpacity: Double
+    public var streamPulseHz: Double
+    public var streamPulseDepth: Double
+    /// The fireflies: how many at once, head size and its spread, speed
+    /// spread, how far they wander off the path, colours (amber and pale
+    /// gold), and the short soft trail each leaves.
+    public var fireflyCount: Int
+    public var fireflySizeMm: Double
+    public var fireflySizeJitter: Double
+    public var fireflySpeedJitter: Double
+    public var fireflyWanderMm: Double
+    public var fireflyColors: [String]
+    public var fireflyTrailPerSecond: Double
+    public var fireflyTrailLifeMs: Int
+    /// The flush step's single first spark: a firefly this many times larger.
+    public var sparkScale: Double
+    /// The badge left on the arm where the port was (charge_mark): this long
+    /// along the forearm, its width from the image's own shape, self-lit in
+    /// its own colours and breathing: `markGlowBase` ± `markGlowDepth` of the
+    /// image's full brightness over `markGlowPeriodMs`, never above full, so
+    /// it cannot wash out to white.
+    public var markLengthMm: Double
+    public var markGlowBase: Double
+    public var markGlowDepth: Double
+    public var markGlowPeriodMs: Int
+
+    /// The badge's brightness at `time` seconds, 0...1 of the image's own.
+    public func markGlow(at time: Double) -> Float {
+        let b = markGlowBase + markGlowDepth * sin(2 * .pi * time * 1000 / Double(max(1, markGlowPeriodMs)))
+        return Float(max(0, min(1, b)))
+    }
+
+    public func fireflyRGB(_ index: Int) -> SIMD3<Float> {
+        guard !fireflyColors.isEmpty else { return SIMD3(1, 0.7, 0.28) }
+        return hexRGB(fireflyColors[index % fireflyColors.count]) ?? SIMD3(1, 0.7, 0.28)
+    }
+    public var fireflyTrailLife: TimeInterval { Double(fireflyTrailLifeMs) / 1000 }
+    public var streamPortLift: Float { Float(streamPortLiftMm / 1000) }
     /// swab: sparkles orbiting the port.
     public var frostSparkleCount: Int
-    /// The cable: core and halo diameters, halo opacity, sag at mid-span, colour.
-    public var cableCoreMm: Double
-    public var cableHaloMm: Double
-    public var cableHaloOpacity: Double
-    public var cableSagM: Double
-    /// "#RRGGBB".
-    public var cableColor: String
-    /// The cable meets the lantern at the top centre, this far above the cap.
-    public var cableSocketAboveCapMm: Double
+    /// The skin-clean sparkles circle the port in these colours, one each,
+    /// round the ring in order; each leaves a short glowing trail in its
+    /// colour, `frostSparkleTrailPerSecond` specks living
+    /// `frostSparkleTrailLifeMs`, so the ring reads as a circle of light.
+    public var frostSparkleColors: [String]
+    public var frostSparkleTrailPerSecond: Double
+    public var frostSparkleTrailLifeMs: Int
 
-    public var cableCore: Float { Float(cableCoreMm / 1000) }
-    public var cableHalo: Float { Float(cableHaloMm / 1000) }
-    public var cableSag: Float { Float(cableSagM) }
-    public var cableSocketAboveCap: Float { Float(cableSocketAboveCapMm / 1000) }
+    /// Colour of sparkle `index`, cycling through the palette.
+    public func frostSparkleRGB(_ index: Int) -> SIMD3<Float> {
+        guard !frostSparkleColors.isEmpty else { return SIMD3(0.85, 0.95, 1) }
+        return hexRGB(frostSparkleColors[index % frostSparkleColors.count]) ?? SIMD3(0.85, 0.95, 1)
+    }
+    public var frostSparkleTrailLife: TimeInterval { Double(frostSparkleTrailLifeMs) / 1000 }
+    /// The stream core's colour, "#RRGGBB".
+    public var cableColor: String
+    /// While charging, the lantern's light pulses: one beat every
+    /// chargePulseStartMs when empty, quickening to chargePulseEndMs when
+    /// full, brightness swinging chargePulseDepth either side (ChargePulse).
+    public var chargePulseStartMs: Int
+    public var chargePulseEndMs: Int
+    public var chargePulseDepth: Double
+
     /// 0...1 components of cableColor.
     public var cableRGB: SIMD3<Float> {
         var hex = cableColor
@@ -411,6 +480,8 @@ public struct AudioConfig: Codable, Equatable, Sendable {
     public var portGainDb: Double
     public var lanternGainDb: Double
     /// Audio ids played at the lantern instead of the port.
+    /// Background music under the whole experience (MusicConfig).
+    public var music: MusicConfig
     public var lanternSounds: [String]
     /// Audio ids that loop until the step changes.
     public var loopingSounds: [String]
@@ -464,6 +535,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var accessSite: AccessSite
     public var cable: CableConfig
     public var sleeve: SleeveConfig
+    public var port: PortLookConfig
     /// Keyed by asset slot name; absent means defaults.
     public var assetOverrides: [String: AssetOverride]
     public var chestPort: ChestPortConfig
@@ -472,6 +544,8 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var lantern: LanternConfig
     public var sky: SkyConfig
     public var tree: TreeConfig
+    /// Sparkles on the lantern or monkey the child's head points at.
+    public var lookSparkle: LookSparkleConfig
     public var charge: ChargeConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
@@ -496,6 +570,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         accessSite = try c.decode(AccessSite.self, forKey: .accessSite)
         cable = try c.decode(CableConfig.self, forKey: .cable)
         sleeve = try c.decode(SleeveConfig.self, forKey: .sleeve)
+        port = try c.decode(PortLookConfig.self, forKey: .port)
         assetOverrides = try c.decodeIfPresent([String: AssetOverride].self, forKey: .assetOverrides) ?? [:]
         chestPort = try c.decode(ChestPortConfig.self, forKey: .chestPort)
         visuals = try c.decode(VisualsConfig.self, forKey: .visuals)
@@ -503,6 +578,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
         sky = try c.decode(SkyConfig.self, forKey: .sky)
         tree = try c.decode(TreeConfig.self, forKey: .tree)
+        lookSparkle = try c.decode(LookSparkleConfig.self, forKey: .lookSparkle)
         charge = try c.decode(ChargeConfig.self, forKey: .charge)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
@@ -525,11 +601,23 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c, debugDescription: "rampDurationMs must be > 0")
         }
+        guard lookSparkle.validate() else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .lookSparkle, in: c, debugDescription: "lookSparkle values out of range")
+        }
+        guard audio.music.validate() else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .audio, in: c, debugDescription: "audio.music values out of range")
+        }
         guard lantern.glowDark >= 0, lantern.glowCharging >= 0, lantern.glowGlance >= 0, lantern.glowLit >= 0,
               hexRGB(lantern.lightColorBottom) != nil, hexRGB(lantern.lightColorTop) != nil,
               hexRGB(lantern.glassColor) != nil else {
             throw DecodingError.dataCorruptedError(
                 forKey: .lantern, in: c, debugDescription: "lantern glow values must be >= 0 and its colours #RRGGBB")
+        }
+        guard port.validate() else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .port, in: c, debugDescription: "port look values out of range or colours not #RRGGBB")
         }
         guard sky.seededSessions >= 0, sky.riseSeconds > 0, sky.smallScale > 0 else {
             throw DecodingError.dataCorruptedError(
@@ -542,7 +630,9 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         guard companion.heightM > 0, companion.fadeS > 0, companion.speed > 0, companion.crossfadeS >= 0,
               companion.chargeVarietyEverySMin > 0,
               companion.chargeVarietyEverySMax >= companion.chargeVarietyEverySMin,
-              !companion.chargeVariety.isEmpty, companion.fidgetMaxPerSession >= 0,
+              !companion.chargeVariety.isEmpty, companion.fidgetMaxPerSession >= 0, companion.wave.validate(),
+              companion.voices.values.allSatisfy({ !$0.isEmpty && $0.allSatisfy { !$0.isEmpty } }),
+              companion.touch.validate(),
               companion.speedOverrides.values.allSatisfy({ $0 > 0 }) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .companion, in: c, debugDescription: "companion config out of range")
@@ -569,11 +659,22 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
               visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,
-              visuals.flowPacketCount > 0, visuals.flowCableFractionPerSecond > 0,
-              (0...0.5).contains(visuals.flowFadeFraction), visuals.cableSocketAboveCapMm >= 0,
-              visuals.cableCoreMm > 0, visuals.cableHaloMm >= visuals.cableCoreMm,
-              (0...1).contains(visuals.cableHaloOpacity), visuals.cableSagM >= 0,
-              visuals.cableColor.count == 7, visuals.cableColor.hasPrefix("#") else {
+              visuals.flowCableFractionPerSecond > 0, (0...0.5).contains(visuals.flowFadeFraction),
+              visuals.streamBend > 0, visuals.streamPortLiftMm >= 0,
+              visuals.streamCoreMm > 0, (0...1).contains(visuals.streamCoreOpacity),
+              visuals.streamPulseHz >= 0, (0...1).contains(visuals.streamPulseDepth),
+              visuals.fireflyCount > 0, visuals.fireflySizeMm > 0,
+              (0..<1).contains(visuals.fireflySizeJitter), (0..<1).contains(visuals.fireflySpeedJitter),
+              visuals.fireflyWanderMm >= 0, !visuals.fireflyColors.isEmpty,
+              visuals.fireflyColors.allSatisfy({ hexRGB($0) != nil }),
+              visuals.fireflyTrailPerSecond >= 0, visuals.fireflyTrailLifeMs > 0, visuals.sparkScale > 0,
+              visuals.markLengthMm > 0, (0...1).contains(visuals.markGlowBase), (0...1).contains(visuals.markGlowDepth),
+              visuals.markGlowPeriodMs > 0,
+              visuals.cableColor.count == 7, visuals.cableColor.hasPrefix("#"),
+              visuals.chargePulseStartMs > 0, visuals.chargePulseEndMs > 0,
+              !visuals.frostSparkleColors.isEmpty, visuals.frostSparkleColors.allSatisfy({ hexRGB($0) != nil }),
+              visuals.frostSparkleTrailPerSecond >= 0, visuals.frostSparkleTrailLifeMs > 0,
+              (0...0.9).contains(visuals.chargePulseDepth) else {
             throw DecodingError.dataCorruptedError(
                 forKey: .visuals, in: c, debugDescription: "visuals config values must be > 0")
         }
@@ -684,7 +785,7 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
         for step in steps {
             guard seen.insert(step.id).inserted else { throw SequenceError.duplicateStepId(step.id) }
         }
-        for required in [StepID.countdown, StepID.charge, config.tree.touch.fromStep] where !seen.contains(required) {
+        for required in [StepID.countdown, StepID.charge] + [config.tree.touch.fromStep].compactMap({ $0 }) where !seen.contains(required) {
             throw SequenceError.missingStep(required)
         }
         for id in steps.map(\.id) + [SessionMarker.idle, SessionMarker.complete] {
@@ -712,4 +813,30 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
     public func step(id: String) -> Step? {
         steps.first { $0.id == id }
     }
+}
+
+/// Background music: one gentle track looping under the whole experience,
+/// from when the space opens. It fades in over `fadeInMs`, and dips to
+/// `duckDb` below its level on `duckSteps` (the countdown and the needle),
+/// so the port's click and pulses stay clear and the child's attention stays
+/// on the port, easing over `duckMs`. Not spatial: it surrounds the child.
+public struct MusicConfig: Codable, Equatable, Sendable {
+    public var enabled: Bool
+    /// In Audio/Music, with its extension.
+    public var file: String
+    public var gainDb: Double
+    public var duckDb: Double
+    public var duckSteps: [String]
+    public var fadeInMs: Int
+    public var duckMs: Int
+
+    public var fadeIn: TimeInterval { Double(fadeInMs) / 1000 }
+    public var duck: TimeInterval { Double(duckMs) / 1000 }
+
+    /// The music's level on this step.
+    public func level(stepId: String) -> Double {
+        duckSteps.contains(stepId) ? gainDb - duckDb : gainDb
+    }
+
+    func validate() -> Bool { !file.isEmpty && gainDb <= 0 && duckDb >= 0 && fadeInMs >= 0 && duckMs >= 0 }
 }

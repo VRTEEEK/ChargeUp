@@ -58,20 +58,32 @@ import Testing
         #expect(throws: SequenceError.missingPrompt(StepID.flush)) { try load(json) }
     }
 
-    @Test func sleeveGlowIsDefaultAndCableIsAmber() throws {
+    @Test func noSleeveByDefaultAndCableIsAmber() throws {
         let seq = try ChargeSequence.shipped()
-        #expect(seq.config.sleeve.style == .glow)
+        #expect(seq.config.sleeve.style == .none, "the port alone on the arm, no glow patch")
         #expect(seq.config.sleeve.glow.extentMinMm == 40 && seq.config.sleeve.glow.extentMaxMm == 140)
         #expect(seq.config.visuals.cableColor == "#FFB347")
         let rgb = seq.config.visuals.cableRGB
         #expect(abs(rgb.x - 1) < 1e-6 && abs(rgb.y - 179.0 / 255) < 1e-6 && abs(rgb.z - 71.0 / 255) < 1e-6)
-        #expect(seq.config.visuals.cableCoreMm == 6)
         #expect(seq.config.cable.rebuildHz == 30)
         #expect(abs(seq.config.cable.minInterval - 1.0 / 30) < 1e-9)
         #expect(seq.config.cable.moveThreshold == 0.002)
-        #expect(seq.config.visuals.flowCableFractionPerSecond == 1.25)
-        #expect(seq.config.visuals.flowFadeFraction == 0.1)
-        #expect(abs(seq.config.visuals.cableSocketAboveCap - 0.004) < 1e-9)
+    }
+
+    @Test func energyStreamIsAGentleFlowOfFireflies() throws {
+        let seq = try ChargeSequence.shipped()
+        let v = seq.config.visuals
+        #expect((3...6).contains(v.streamCoreMm), "a very thin core, 3 to 6 mm")
+        #expect(v.streamCoreOpacity <= 0.3, "faint, not an opaque beam")
+        #expect(v.fireflyCount <= 24 && v.fireflySizeMm <= 3, "modest density, small lights")
+        #expect(v.fireflyColors.count >= 2, "amber and pale gold")
+        for i in v.fireflyColors.indices {
+            let c = v.fireflyRGB(i)
+            #expect(c.x >= c.y && c.y > c.z, "warm, not white or blue")
+        }
+        #expect(v.flowCableFractionPerSecond < 1, "gentle: more than a second from port to lantern")
+        #expect(seq.step(id: StepID.charge)?.perceived.contains("fireflies") == true)
+        #expect(seq.step(id: StepID.connect)?.perceived.contains("stream") == true)
     }
 
     @Test func companionCuesPerStepAndOnForTheDemo() throws {
@@ -124,6 +136,94 @@ import Testing
         config["lantern"] = lantern
         json["config"] = config
         #expect(throws: DecodingError.self) { try load(json) }
+    }
+
+    @Test func chargingLanternPulsesQuickerAsItFills() throws {
+        let seq = try ChargeSequence.shipped()
+        let v = seq.config.visuals
+        #expect(seq.step(id: StepID.charge)?.perceived.contains("pulsing") == true, "the row names the pulse")
+        #expect(abs(ChargePulse.period(level: 0, visuals: v) - Double(v.chargePulseStartMs) / 1000) < 1e-9)
+        #expect(abs(ChargePulse.period(level: 1, visuals: v) - Double(v.chargePulseEndMs) / 1000) < 1e-9)
+        #expect(ChargePulse.period(level: 1, visuals: v) < ChargePulse.period(level: 0, visuals: v), "quicker when full")
+
+        // Over one empty-lantern period it rises above 1, falls below, and stays within depth.
+        var pulse = ChargePulse()
+        let dt = 1.0 / 90, steps = Int(ChargePulse.period(level: 0, visuals: v) / dt)
+        var values: [Double] = []
+        for _ in 0..<steps { values.append(pulse.advance(dt: dt, level: 0, visuals: v)) }
+        #expect(values.max()! > 1 + v.chargePulseDepth * 0.95 && values.min()! < 1 - v.chargePulseDepth * 0.95)
+        #expect(values.allSatisfy { abs($0 - 1) <= v.chargePulseDepth + 1e-9 })
+
+        // Changing the level mid-beat never jumps the brightness.
+        var a = ChargePulse()
+        let before = a.advance(dt: 0.3, level: 0.2, visuals: v)
+        let after = a.advance(dt: dt, level: 0.9, visuals: v)
+        #expect(abs(after - before) < 0.05)
+    }
+
+    @Test func skinCleanSparklesAreManyColoursAndTheRowSaysSo() throws {
+        let seq = try ChargeSequence.shipped()
+        let v = seq.config.visuals
+        #expect(seq.step(id: StepID.clean)?.perceived.contains("many colours") == true)
+        #expect(Set(v.frostSparkleColors).count >= 3, "a ring of several colours, not one")
+        let ring = (0..<v.frostSparkleCount).map { v.frostSparkleRGB($0) }
+        #expect(ring[0] != ring[1], "neighbours differ")
+        #expect(v.frostSparkleRGB(v.frostSparkleColors.count) == v.frostSparkleRGB(0), "the palette cycles round the ring")
+    }
+
+    @Test func badSparkleColourFails() throws {
+        var json = try shippedJSON()
+        var config = json["config"] as! [String: Any]
+        var visuals = config["visuals"] as! [String: Any]
+        visuals["frostSparkleColors"] = ["#5CE1FF", "pink"]
+        config["visuals"] = visuals
+        json["config"] = config
+        #expect(throws: DecodingError.self) { try load(json) }
+    }
+
+    @Test func portIsAGentleAmberJewel() throws {
+        let seq = try ChargeSequence.shipped()
+        let port = seq.config.port
+        // The step visuals ask for 0.2 (cream start), 2 (rest), 2-4 (frost) and up to 10 (countdown peak).
+        #expect(port.glow(for: 10) <= Float(port.glowMax) + 1e-6, "the countdown peak never passes the cap")
+        #expect(abs(port.glow(for: 10) - Float(port.glowMax)) < 0.01, "and reaches it, so the pulses keep their shape")
+        #expect(port.glow(for: 2) < port.glow(for: 10) / 3, "the three pulses stand well clear of the resting glow")
+        #expect(port.glow(for: 0.2) < port.glow(for: 2), "the cream warms it from almost nothing")
+        #expect(port.glow(for: -1) == 0)
+        #expect(port.glowMax <= 1.5, "subtle: no overexposure in room light")
+        let amber = port.glowRGB
+        #expect(amber.x > amber.y && amber.y > amber.z, "amber, not white or blue")
+        #expect(port.glassOpacity >= 0.8, "a jewel, not a see-through coin")
+        #expect(port.sinkMm >= 0 && port.sinkMm <= 3)
+        #expect(port.motes.perSecond <= 8 && port.motes.sizeMm <= 2.5, "a few small motes, not a glow")
+        #expect(seq.step(id: StepID.cream)?.perceived.contains("amber glass") == true)
+    }
+
+    @Test func theBadgeGlowsAndBreathesGently() throws {
+        let seq = try ChargeSequence.shipped()
+        let v = seq.config.visuals
+        let samples = stride(from: 0.0, to: Double(v.markGlowPeriodMs) / 1000, by: 0.01).map { v.markGlow(at: $0) }
+        #expect(samples.min()! > 0.5, "always glowing")
+        #expect(samples.max()! - samples.min()! > 0.2, "visibly breathing")
+        #expect(samples.max()! <= 1, "never brighter than the image itself, so never white")
+        #expect((40...100).contains(v.markLengthMm), "badge-sized on a forearm")
+        #expect(seq.step(id: StepID.release)?.perceived.contains("glowing badge") == true)
+    }
+
+    @Test func theMonkeySpeaksOnlyOnItsFriendlyMomentsAndEveryVoiceHasAFile() throws {
+        let c = try ChargeSequence.shipped().config.companion
+        #expect(Set(c.voices.keys) == ["wave", "cheer", "heart"])
+        for quiet in c.chargeVariety + ["look", "listen", "fidget"] {
+            #expect(c.voices[quiet] == nil, "\(quiet) plays while the child may rest: silent")
+        }
+        #expect((c.voices["wave"]?.count ?? 0) >= 2, "greetings take turns")
+        let sounds = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Apps/ChargeUpVision/Audio/Sounds")
+        for id in c.voiceIds {
+            #expect(FileManager.default.fileExists(atPath: sounds.appendingPathComponent("\(id).wav").path), "\(id).wav")
+        }
     }
 
     @Test func audioConfigAndIds() throws {

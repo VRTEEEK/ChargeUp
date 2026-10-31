@@ -45,6 +45,8 @@ final class ChargeObjectEntity {
     /// 0...1 extra brightness while the child glances at the lantern during
     /// the infusion. Set by SceneDirector; decays on its own.
     var glance: Float = 0
+    /// Brightness multiplier while charging, from ChargePulse; 1 otherwise.
+    var pulse: Float = 1
     /// Overall brightness multiplier for sky lanterns (a half-filled session glows less).
     private var brightness: Float = 1
 
@@ -58,12 +60,14 @@ final class ChargeObjectEntity {
     var baseY: Float { modelBounds.map { -($0.max.y - $0.min.y) / 2 } ?? -(Self.bodyHeight / 2 + Self.capHeight) }
     var halfWidth: Float { modelBounds.map { ($0.max.x - $0.min.x) / 2 } ?? (Self.bodyRadius + 0.006) }
 
-    /// Where the cable meets the lantern, in the root frame: the top centre,
-    /// `aboveCap` metres above the highest point of the cap. From the
-    /// model's bounds when designed (the model is centred on the body).
-    func cableSocket(aboveCap: Float) -> SIMD3<Float> {
-        body.convert(position: SIMD3(0, topY + aboveCap, 0), to: root)
+    /// Where the energy stream goes into the lantern, in the root frame: the
+    /// centre of its Glass mesh (the light column inside the cage), so the
+    /// fireflies dissolve into the light. The body origin for the placeholder.
+    var streamTarget: SIMD3<Float> {
+        body.convert(position: glassCentre, to: root)
     }
+    /// The Glass mesh's centre in the body frame.
+    private var glassCentre = SIMD3<Float>(repeating: 0)
 
     /// Full height at scale 1, and the distance from the body origin up to
     /// the very top (the ring a hung lantern hangs by).
@@ -130,6 +134,8 @@ final class ChargeObjectEntity {
             // The shader masks on object-space height: tell it where this
             // model's glass starts and how tall it is.
             let glass = AssetCatalog.glassBounds(in: model) ?? bounds
+            // The model sits at -bounds.center under the body.
+            glassCentre = glass.center - bounds.center
             AssetCatalog.setParameter("baseY", glass.min.y, in: model)
             AssetCatalog.setParameter("height", max(0.001, glass.max.y - glass.min.y), in: model)
             let colors = Self.lightColors
@@ -154,7 +160,7 @@ final class ChargeObjectEntity {
             let g = Self.glowLevels
             switch newState {
             case .dark: applyToModel(fill: 0, glow: g.dark)
-            case .charging(let level): applyToModel(fill: max(0, min(1, level)), glow: (g.charging + g.glance * max(0, min(1, glance))) * brightness)
+            case .charging(let level): applyToModel(fill: max(0, min(1, level)), glow: (g.charging + g.glance * max(0, min(1, glance))) * brightness * pulse)
             case .lit: applyToModel(fill: 1, glow: g.lit * brightness)
             }
             return
@@ -168,8 +174,8 @@ final class ChargeObjectEntity {
             let g = max(0, min(1, glance))
             // Resting during the infusion the lantern is calm; a glance
             // brightens the core and shows the fill clearly, then settles.
-            core.model?.materials = [Self.glowMaterial(intensity: 0.2 + 1.5 * l + 3.0 * g)]
-            fill.model?.materials = [Self.glowMaterial(intensity: 0.3 + 1.2 * g)]
+            core.model?.materials = [Self.glowMaterial(intensity: (0.2 + 1.5 * l + 3.0 * g) * pulse)]
+            fill.model?.materials = [Self.glowMaterial(intensity: (0.3 + 1.2 * g) * pulse)]
             setFill(l)
         case .lit:
             core.model?.materials = [Self.glowMaterial(intensity: 4.0 * brightness)]

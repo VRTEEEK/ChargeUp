@@ -37,11 +37,29 @@ final class SceneDirector {
     private var pendingRecord: SessionRecord?
     private var lastFrameAt: TimeInterval = 0
     private var headWasOnLantern = false
+    /// One wave detector per hand (0 left, 1 right) and the answer chooser.
+    private var waveDetectors: [Int: WaveDetector] = [:]
+    private var waveResponder = CompanionResponder()
+    /// Touching the monkey: one trigger for all hand points.
+    private var companionTouch = TreeTouch.Trigger()
+    /// Touch and pinch on the monkey share one cooldown: when it last played
+    /// a random clip, and which.
+    private var lastPlayAt: TimeInterval = -.infinity
+    private var lastPlayClip: String?
+    private var playRandom = SystemRandomNumberGenerator()
+    /// The last chime a pinched lantern played, so the next is different.
+    private var lastChime: String?
+    /// Sparkles on what the child's head points at (LookSparkle): one
+    /// emitter, moved to the picked lantern or the monkey.
+    private let lookSparkle: Entity
+    private var lookPicker = LookPicker()
+    private var lookTarget: String?
 
     init(controller: SessionController) {
         self.controller = controller
         let config = controller.sequence.config
         let assets = controller.assets
+        lookSparkle = Self.makeLookSparkle(config.lookSparkle)
         ChargeObjectEntity.glowLevels = (dark: Float(config.lantern.glowDark), charging: Float(config.lantern.glowCharging),
                                    glance: Float(config.lantern.glowGlance), lit: Float(config.lantern.glowLit))
         func color(_ rgb: SIMD3<Float>) -> UIColor {
@@ -50,18 +68,22 @@ final class SceneDirector {
         ChargeObjectEntity.lightColors = (bottom: color(config.lantern.lightBottomRGB),
                                           top: color(config.lantern.lightTopRGB),
                                           glass: color(config.lantern.glassRGB))
-        sounds = SoundBank(config: config.audio)
+        let bank = SoundBank(config: config.audio, companionGainDb: config.companion.voiceGainDb,
+                             chimeGainDb: config.tree.touch.pinchSoundGainDb)
+        sounds = bank
         let portSlot: AssetSlot = config.accessSite == .arm ? .portRing : .portPlate
-        rig = PortRig(sparkleCount: config.visuals.frostSparkleCount, accessSite: config.accessSite,
+        rig = PortRig(visuals: config.visuals, look: config.port, accessSite: config.accessSite,
                       plateSize: config.chestPort.plateSize, sleeveConfig: config.sleeve,
                       forearmRadius: config.forearm.forearmRadius, assets: assets,
                       glassMask: controller.sequence.assetOverride(portSlot.rawValue).glassMask)
-        controller.noteSleeve(rig.sleeveTileUsed.map { config.sleeve.style == .glow ? $0 : "\($0) at \(config.sleeve.opacity)" } ?? "no tile; none")
+        controller.noteSleeve(config.sleeve.style == .none ? "none (port alone)"
+                              : rig.sleeveTileUsed.map { config.sleeve.style == .glow ? $0 : "\($0) at \(config.sleeve.opacity)" } ?? "no tile; none")
         rig.root.isEnabled = false
         rig.root.addChild(sounds.portSource)
         anchor.name = "lanternAnchor"
         anchor.isEnabled = false
         anchor.addChild(sounds.lanternSource)
+        anchor.addChild(sounds.musicSource)
         lantern = ChargeObjectEntity(model: assets.model(.lanternHero))
         anchor.addChild(lantern.root)
         flow = EnergyFlow(config: config.visuals, cable: config.cable, assets: assets)
@@ -87,6 +109,10 @@ final class SceneDirector {
                 c.place(lanternBaseY: lantern.baseY, lanternHalfWidth: lantern.halfWidth, heldArm: config.forearm.heldArm)
                 anchor.addChild(c.root)
             }
+            bank.companionSource.position = c.headTop
+            c.root.addChild(bank.companionSource)
+            let voices = config.companion.voices
+            c.onClipStarted = { [weak bank] clip in bank?.playVoice(forClip: clip, voices: voices) }
             companion = c
             controller.noteCompanion(c.status)
         } else {
@@ -102,10 +128,14 @@ final class SceneDirector {
         content.add(anchor)
         tree?.attach(to: content)
         flow.attach(to: content)
+        content.add(lookSparkle)
+        content.add(sounds.chimeSource)
     }
 
     func loadSounds() async {
-        await sounds.load(ids: controller.sequence.audioIds)
+        let config = controller.sequence.config
+        await sounds.load(ids: controller.sequence.audioIds + config.companion.voiceIds + config.tree.touch.pinchSounds)
+        sounds.startMusic()
         controller.noteAudio(sounds.status)
     }
 
@@ -130,15 +160,22 @@ final class SceneDirector {
         updateGlance(dt: dt)
         updateRise(now: now)
         tree?.update(now: now)
-        if sky.isTree, TreeTouch.isActive(stepId: controller.currentStepId,
-                                          steps: controller.sequence.steps.map(\.id),
-                                          touch: controller.sequence.config.tree.touch) {
+        let lanternsReachable = sky.isTree && TreeTouch.isActive(stepId: controller.currentStepId,
+                                                                  steps: controller.sequence.steps.map(\.id),
+                                                                  touch: controller.sequence.config.tree.touch)
+        if lanternsReachable {
             sky.touch(points: controller.portSource.touchPoints(now: now), now: now)
         }
+        sky.setPinchable(lanternsReachable && controller.sequence.config.tree.touch.pinch)
+        updateLookSparkle(now: now)
         sky.update(now: now)
         let rate = String(format: "%.0f/s", flow.rebuildsPerSecond)
         if rate != controller.cableStatus { controller.noteCable(rate) }
         if let companion {
+            answerWaves(companion, now: now)
+            answerTouch(companion, now: now)
+            let touch = controller.sequence.config.companion.touch
+            companion.setPinchable(companion.isPresent && touch.pinch && touch.isActive(stepId: controller.currentStepId))
             if tree != nil {
                 // Under the tree it stands to one side; turn it to look at the child.
                 let config = controller.sequence.config
@@ -150,10 +187,12 @@ final class SceneDirector {
             if companion.status != controller.companionStatus { controller.noteCompanion(companion.status) }
         }
         let socket = lantern.root.convert(
-            position: lantern.cableSocket(aboveCap: controller.sequence.config.visuals.cableSocketAboveCap), to: nil)
+            position: lantern.streamTarget, to: nil)
         visuals.update(now: now, charge: Float(state.charge),
                        isCharging: state.isCharging(in: controller.sequence),
-                       portWorld: pose?.position, socketWorld: socket)
+                       portWorld: pose?.position,
+                       portUp: pose.map { $0.orientation.act(SIMD3<Float>(0, 1, 0)) } ?? SIMD3(0, 1, 0),
+                       socketWorld: socket)
     }
 
     /// At release the current lantern flies to its place over
@@ -244,6 +283,153 @@ final class SceneDirector {
         lantern.root.isEnabled = true
     }
 
+    /// The monkey waves back: each hand's side-to-side motion across the
+    /// child's head goes through its own WaveDetector; a completed wave gets
+    /// the next answer from the WaveResponder, unless the monkey is busy.
+    /// Quiet on the countdown and the needle (config.companion.wave).
+    private func answerWaves(_ companion: CompanionEntity, now: TimeInterval) {
+        let wave = controller.sequence.config.companion.wave
+        guard companion.isPresent, wave.isActive(stepId: controller.currentStepId),
+              let head = controller.headPose.current() else {
+            waveDetectors = [:]
+            return
+        }
+        for (hand, centre) in controller.portSource.handCentres(now: now) {
+            let m = WaveDetector.measure(hand: centre, head: head, config: wave)
+            var detector = waveDetectors[hand] ?? WaveDetector()
+            let waved = detector.observe(lateral: m.lateral, raised: m.raised, time: now, config: wave)
+            waveDetectors[hand] = detector
+            guard waved else { continue }
+            var responder = waveResponder
+            if let clip = responder.respond(at: now, config: wave), companion.answer(clip, at: now) {
+                waveResponder = responder
+            }
+        }
+    }
+
+    /// Sparkles on the lantern or monkey the head points at. Lanterns are
+    /// always candidates; the monkey while it is out and not on a quiet step.
+    private func updateLookSparkle(now: TimeInterval) {
+        let config = controller.sequence.config.lookSparkle
+        guard config.enabled, let head = controller.headPose.current() else {
+            setLookSparkle(nil, centre: .zero, radius: 0)
+            return
+        }
+        let eye = ForearmPoseSolver.translation(of: head)
+        let f = head.columns.2
+        let forward = -SIMD3<Float>(f.x, f.y, f.z)
+        var targets: [String: (centre: SIMD3<Float>, radius: Float)] = [:]
+        if sky.isTree { for t in sky.lookTargets() { targets[t.key] = (t.centre, t.radius) } }
+        if let companion, companion.isPresent,
+           controller.sequence.config.companion.touch.isActive(stepId: controller.currentStepId) {
+            let base = companion.root.position(relativeTo: nil)
+            let height = companion.root.convert(position: companion.headTop, to: nil).y - base.y
+            targets["monkey"] = (base + SIMD3(0, height / 2, 0), height / 2)
+        }
+        let offAxis = targets.mapValues { LookSparkleConfig.offAxis(head: eye, forward: forward, centre: $0.centre, radius: $0.radius) }
+        let picked = lookPicker.update(offAxis: offAxis, time: now, config: config)
+        if let picked, let t = targets[picked] {
+            setLookSparkle(picked, centre: t.centre, radius: t.radius)
+        } else {
+            setLookSparkle(nil, centre: .zero, radius: 0)
+        }
+    }
+
+    /// Moves the sparkle emitter onto the picked object every frame (so it
+    /// follows a swinging lantern) and sizes it to the object on a change.
+    /// Sparkles already shed stay where they are and fade.
+    private func setLookSparkle(_ key: String?, centre: SIMD3<Float>, radius: Float) {
+        guard var p = lookSparkle.components[ParticleEmitterComponent.self] else { return }
+        if key != lookTarget {
+            lookTarget = key
+            if key != nil { p.emitterShapeSize = SIMD3(repeating: radius * 2) }
+            p.isEmitting = key != nil
+            lookSparkle.components.set(p)
+        }
+        if key != nil { lookSparkle.position = centre }
+    }
+
+    private static func makeLookSparkle(_ c: LookSparkleConfig) -> Entity {
+        let e = Entity()
+        e.name = "lookSparkle"
+        var p = ParticleEmitterComponent()
+        p.emitterShape = .sphere
+        p.birthLocation = .surface
+        p.birthDirection = .normal
+        p.speed = Float(c.speedMmPerS / 1000)
+        p.speedVariation = Float(c.speedMmPerS / 1000) * 0.5
+        p.particlesInheritTransform = false
+        p.isEmitting = false
+        var m = p.mainEmitter
+        m.birthRate = Float(c.perSecond)
+        m.lifeSpan = c.life
+        m.lifeSpanVariation = c.life * 0.3
+        m.size = Float(c.sizeMm / 1000)
+        m.sizeVariation = Float(c.sizeMm / 1000) * 0.4
+        m.sizeMultiplierAtEndOfLifespan = 0.2
+        m.color = .constant(.single(UIColor(red: CGFloat(c.rgb.x), green: CGFloat(c.rgb.y), blue: CGFloat(c.rgb.z), alpha: 1)))
+        m.opacityCurve = .gradualFadeInOut
+        m.blendMode = .additive
+        m.billboardMode = .billboard
+        m.noiseStrength = 0.01
+        m.noiseScale = 1
+        m.noiseAnimationSpeed = 0.3
+        m.isLightingEnabled = false
+        p.mainEmitter = m
+        e.components.set(p)
+        return e
+    }
+
+    /// Look and pinch: on a hung lantern it swings away from the child; on
+    /// the monkey it plays a random clip, never the same twice running, at
+    /// most once per config.companion.touch.cooldownMs.
+    func pinch(_ entity: Entity) {
+        let now = CACurrentMediaTime()
+        if let companion, companion.contains(entity) {
+            let touch = controller.sequence.config.companion.touch
+            guard companion.isPresent, touch.pinch, touch.isActive(stepId: controller.currentStepId) else { return }
+            playRandomClip(companion, now: now)
+            return
+        }
+        let head = controller.headPose.current().map { ForearmPoseSolver.translation(of: $0) }
+            ?? SIMD3(0, controller.sequence.config.lantern.fallbackHeadHeight, 0)
+        if let centre = sky.pinch(entity, head: head, now: now),
+           let chime = controller.sequence.config.tree.touch.randomPinchSound(after: lastChime, using: &playRandom) {
+            lastChime = chime
+            sounds.playChime(chime, at: centre)
+        }
+    }
+
+    /// Touching the monkey: a fingertip or knuckle reaching its body (a
+    /// standing capsule from its feet to the top of its head) plays the next
+    /// cute clip, once until the hand moves away (config.companion.touch).
+    private func answerTouch(_ companion: CompanionEntity, now: TimeInterval) {
+        let touch = controller.sequence.config.companion.touch
+        guard companion.isPresent, touch.isActive(stepId: controller.currentStepId) else {
+            companionTouch = TreeTouch.Trigger()
+            return
+        }
+        let points = controller.portSource.touchPoints(now: now)
+        guard !points.isEmpty else { return }
+        let base = companion.root.position(relativeTo: nil)
+        let height = companion.root.convert(position: companion.headTop, to: nil).y - base.y
+        let radius = height * Float(touch.bodyRadius)
+        let nearest = points.map { CompanionTouchConfig.distanceToBody($0, base: base, height: height, radius: radius) }.min() ?? .infinity
+        guard companionTouch.update(distance: nearest, radius: Float(touch.marginMm / 1000), rearm: Float(touch.rearmMm / 1000)) else { return }
+        playRandomClip(companion, now: now)
+    }
+
+    /// Touch and pinch: a random clip, never the same twice running, at
+    /// most once per config.companion.touch.cooldownMs across both.
+    private func playRandomClip(_ companion: CompanionEntity, now: TimeInterval) {
+        let touch = controller.sequence.config.companion.touch
+        guard now - lastPlayAt >= touch.cooldown,
+              let clip = touch.randomResponse(after: lastPlayClip, using: &playRandom),
+              companion.answer(clip, at: now) else { return }
+        lastPlayAt = now
+        lastPlayClip = clip
+    }
+
     /// Nice to have from the brief: during the infusion, a head turn toward
     /// the lantern brightens it briefly, then it settles. Edge-triggered on
     /// entering the cone, decays over config.charge.glanceSeconds.
@@ -293,5 +479,6 @@ final class SceneDirector {
         } else {
             sounds.stopLoop()
         }
+        sounds.setMusic(forStep: stepId)
     }
 }

@@ -31,6 +31,8 @@ final class ForearmAnchor: ObservableObject {
     /// Each tracked hand's touch points in world space, from its latest
     /// update; a hand drops out when ARKit loses it.
     private var handPoints: [HandAnchor.Chirality: [SIMD3<Float>]] = [:]
+    /// Each tracked hand's middle knuckle, for recognising a wave.
+    private var handKnuckles: [HandAnchor.Chirality: SIMD3<Float>] = [:]
     private static let touchJoints: [HandSkeleton.JointName] = [
         .thumbTip, .indexFingerTip, .middleFingerTip, .ringFingerTip, .littleFingerTip, .middleFingerKnuckle,
     ]
@@ -78,11 +80,18 @@ final class ForearmAnchor: ObservableObject {
         session.stop()
         tracker.reset()
         handPoints = [:]
+        handKnuckles = [:]
         status = .idle
     }
 
     func touchPoints(now: TimeInterval) -> [SIMD3<Float>] {
         handPoints.values.flatMap { $0 }
+    }
+
+    func handCentres(now: TimeInterval) -> [Int: SIMD3<Float>] {
+        var centres: [Int: SIMD3<Float>] = [:]
+        for (chirality, knuckle) in handKnuckles { centres[chirality == .left ? 0 : 1] = knuckle }
+        return centres
     }
 
     /// Called once per rendered frame by the scene. Returns nil until the
@@ -133,6 +142,7 @@ final class ForearmAnchor: ObservableObject {
         let anchor = update.anchor
         guard update.event != .removed, anchor.isTracked, let skeleton = anchor.handSkeleton else {
             handPoints[anchor.chirality] = nil
+            handKnuckles[anchor.chirality] = nil
             return
         }
         let origin = anchor.originFromAnchorTransform
@@ -141,5 +151,8 @@ final class ForearmAnchor: ObservableObject {
             guard joint.isTracked else { return nil }
             return ForearmPoseSolver.translation(of: origin * joint.anchorFromJointTransform)
         }
+        let knuckle = skeleton.joint(.middleFingerKnuckle)
+        handKnuckles[anchor.chirality] = knuckle.isTracked
+            ? ForearmPoseSolver.translation(of: origin * knuckle.anchorFromJointTransform) : nil
     }
 }

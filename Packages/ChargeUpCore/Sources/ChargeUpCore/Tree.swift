@@ -123,10 +123,11 @@ public struct TreeBurstConfig: Codable, Equatable, Sendable {
 /// A hung lantern swings when a real hand touches it: pushed away from the
 /// hand, at its own pendulum rate, dying away on top of the gentle sway.
 public struct TreeTouchConfig: Codable, Equatable, Sendable {
-    /// The first step at which touch works. It keeps working through the
-    /// later steps and after the session, never before: the needle steps
-    /// need the child still.
-    public var fromStep: String
+    /// The first step at which touch and pinch work; they keep working
+    /// through the later steps and after the session. Absent (null): always,
+    /// from the moment the space opens, every step included (Mo's choice,
+    /// 31 Oct). Set it to a step id to hold the lanterns still before then.
+    public var fromStep: String?
     /// A fingertip or knuckle closer than this to a lantern's centre touches it.
     public var radiusMm: Double
     /// The hand must then move this much further out before the same
@@ -135,6 +136,24 @@ public struct TreeTouchConfig: Codable, Equatable, Sendable {
     /// Peak swing, and the time for it to fall to about a third.
     public var swingDeg: Double
     public var decaySeconds: Double
+    /// Look and pinch, the system's own targeting: the lantern looked at
+    /// shows the system hover highlight, and a pinch swings it away from the
+    /// child, the same swing as a touch. `pinchTargetMm` is the radius of
+    /// the target round each lantern, generous enough to pick out at 2.5 m.
+    public var pinch: Bool
+    public var pinchTargetMm: Double
+    /// A pinched lantern also chimes: a random one of these small sounds
+    /// (Audio/Sounds, without .wav), never the same twice running, from the
+    /// lantern itself, at `pinchSoundGainDb`. Five soft bell tones on a
+    /// pentatonic scale, made for the app, so any two in a row sound sweet.
+    public var pinchSounds: [String]
+    public var pinchSoundGainDb: Double
+
+    /// A random chime, never `last` again.
+    public func randomPinchSound(after last: String?, using rng: inout some RandomNumberGenerator) -> String? {
+        let pool = pinchSounds.count > 1 ? pinchSounds.filter { $0 != last } : pinchSounds
+        return pool.randomElement(using: &rng)
+    }
 }
 
 func hexRGB(_ hex: String) -> SIMD3<Float>? {
@@ -158,6 +177,7 @@ extension TreeConfig {
             && trail.birthRate >= 0 && trail.lifeSpanS > 0 && trail.sizeMm > 0
             && landingBurst.count >= 0 && landingBurst.sizeMm > 0 && landingBurst.lifeSpanS > 0
             && touch.radiusMm > 0 && touch.rearmMm >= 0 && touch.swingDeg > 0 && touch.decaySeconds > 0
+            && touch.pinchTargetMm > 0 && touch.pinchSoundGainDb <= 0 && touch.pinchSounds.allSatisfy({ !$0.isEmpty })
             && !hooks.isEmpty && hooks.allSatisfy { $0.count == 4 && $0[3] >= 0 }
     }
 }
@@ -243,8 +263,9 @@ public enum TreePlacement {
 public enum TreeTouch {
     /// Whether hung lanterns answer a touch at this point of the session.
     public static func isActive(stepId: String, steps: [String], touch: TreeTouchConfig) -> Bool {
+        guard let fromStep = touch.fromStep else { return true }
         if stepId == SessionMarker.complete { return true }
-        guard let from = steps.firstIndex(of: touch.fromStep), let now = steps.firstIndex(of: stepId) else { return false }
+        guard let from = steps.firstIndex(of: fromStep), let now = steps.firstIndex(of: stepId) else { return false }
         return now >= from
     }
 
@@ -254,12 +275,16 @@ public enum TreeTouch {
         public private(set) var armed = true
         public init() {}
         public mutating func update(distance: Float, touch: TreeTouchConfig) -> Bool {
-            let radius = Float(touch.radiusMm / 1000)
+            update(distance: distance, radius: Float(touch.radiusMm / 1000), rearm: Float(touch.rearmMm / 1000))
+        }
+
+        /// Fires on coming within `radius`; re-arms beyond `radius + rearm` (metres).
+        public mutating func update(distance: Float, radius: Float, rearm: Float) -> Bool {
             if armed, distance < radius {
                 armed = false
                 return true
             }
-            if !armed, distance > radius + Float(touch.rearmMm / 1000) { armed = true }
+            if !armed, distance > radius + rearm { armed = true }
             return false
         }
     }

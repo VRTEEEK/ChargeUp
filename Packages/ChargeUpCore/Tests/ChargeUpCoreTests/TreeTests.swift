@@ -81,11 +81,33 @@ import simd
         #expect(try ChargeSequence.shipped().config.tree.companion.turnDegPerSecond > 0)
     }
 
-    @Test func touchWorksFromTheInfusionOnAndNeverBeforeTheNeedle() throws {
+    @Test func lanternsAnswerTouchAndPinchAllTheTime() throws {
         let seq = try ChargeSequence.shipped()
-        let touch = seq.config.tree.touch, ids = seq.steps.map(\.id)
-        #expect(touch.fromStep == StepID.charge)
-        for id in [SessionMarker.idle, StepID.cream, StepID.clean, StepID.countdown, StepID.connect, StepID.flush] {
+        var touch = seq.config.tree.touch
+        let ids = seq.steps.map(\.id)
+        #expect(touch.fromStep == nil, "always on")
+        #expect(touch.pinch && touch.pinchTargetMm >= 60, "look and pinch on, with a target easy to pick at 2.5 m")
+        // A pinch chimes: a random small sound, never the same twice running, each with a file.
+        #expect(touch.pinchSounds.count >= 3 && touch.pinchSoundGainDb <= -4)
+        var rng = SystemRandomNumberGenerator()
+        var last: String?
+        for _ in 0..<100 {
+            let chime = try #require(touch.randomPinchSound(after: last, using: &rng))
+            #expect(chime != last)
+            last = chime
+        }
+        let sounds = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Apps/ChargeUpVision/Audio/Sounds")
+        for id in touch.pinchSounds {
+            #expect(FileManager.default.fileExists(atPath: sounds.appendingPathComponent("\(id).wav").path), "\(id).wav")
+        }
+        for id in [SessionMarker.idle] + ids + [SessionMarker.complete] {
+            #expect(TreeTouch.isActive(stepId: id, steps: ids, touch: touch), "\(id)")
+        }
+        // A start step still holds them still before it, if one is set.
+        touch.fromStep = StepID.charge
+        for id in [SessionMarker.idle, StepID.cream, StepID.countdown, StepID.connect] {
             #expect(!TreeTouch.isActive(stepId: id, steps: ids, touch: touch), "\(id)")
         }
         for id in [StepID.charge, StepID.release, SessionMarker.complete] {

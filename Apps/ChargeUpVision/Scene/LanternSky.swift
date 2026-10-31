@@ -169,6 +169,16 @@ final class LanternSky {
         lantern.apply(.lit)
         lantern.setBrightness(Self.brightness(for: session))
         lantern.root.name = "skyLantern\(index)"
+        if let tree, tree.touch.pinch {
+            // A target round the lantern for look and pinch, scaled with it.
+            // No hover highlight: it paled the lantern; LookSparkle answers
+            // looking instead, with sparkles, never changing the lantern.
+            let radius = Float(tree.touch.pinchTargetMm / 1000) / lanternScale
+            lantern.root.components.set(CollisionComponent(shapes: [.generateSphere(radius: radius)]))
+            var input = InputTargetComponent()
+            input.isEnabled = pinchable
+            lantern.root.components.set(input)
+        }
         hanger.addChild(lantern.root)
 
         var chain: ModelEntity?
@@ -191,6 +201,46 @@ final class LanternSky {
                              swingAxis: SIMD3(cos(a), 0, sin(a))))
         touches.append(Touch())
         records.append(session)
+    }
+
+    /// Every hung lantern as a look target: a stable key, its centre in the
+    /// world, and its radius.
+    func lookTargets() -> [(key: String, centre: SIMD3<Float>, radius: Float)] {
+        let radius = lanternHeight * lanternScale / 2
+        return entries.enumerated().map { ("lantern\($0.offset)", $0.element.lantern.body.position(relativeTo: nil), radius) }
+    }
+
+    /// Whether the lanterns take look and pinch now (only while touch is active).
+    private var pinchable = false
+
+    func setPinchable(_ on: Bool) {
+        guard on != pinchable else { return }
+        pinchable = on
+        for e in entries {
+            guard var input = e.lantern.root.components[InputTargetComponent.self] else { continue }
+            input.isEnabled = on
+            e.lantern.root.components.set(input)
+        }
+    }
+
+    /// A pinch on `entity` (a hung lantern or part of one): it swings away
+    /// from the child's head, the same swing as a touch. Returns the
+    /// lantern's centre in the world, or nil if it was not a hung lantern.
+    func pinch(_ entity: Entity, head: SIMD3<Float>, now: TimeInterval) -> SIMD3<Float>? {
+        guard pinchable else { return nil }
+        var node: Entity? = entity
+        var index: Int?
+        while let n = node, index == nil {
+            index = entries.firstIndex { $0.lantern.root === n }
+            node = n.parent
+        }
+        guard let i = index else { return nil }
+        let centre = entries[i].lantern.body.position(relativeTo: nil)
+        let push = root.convert(direction: centre - head, from: nil)
+        guard let axis = TreeTouch.swingAxis(push: push) else { return nil }
+        touches[i].axis = axis
+        touches[i].startedAt = now
+        return centre
     }
 
     /// Per frame while touch is active (config.tree.touch): a hand point

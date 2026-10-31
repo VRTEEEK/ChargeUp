@@ -18,6 +18,8 @@ final class StepVisuals {
     private var enteredAt: TimeInterval = 0
     private var lastUpdate: TimeInterval = 0
     private var glowPulse: Float = 0
+    /// The lantern's breathing light while it charges.
+    private var chargePulse = ChargePulse()
 
     init(config: VisualsConfig, rig: PortRig, lantern: ChargeObjectEntity, flow: EnergyFlow) {
         self.config = config
@@ -31,6 +33,8 @@ final class StepVisuals {
     func enter(_ id: String, at now: TimeInterval) {
         stepId = id
         enteredAt = now
+        chargePulse = ChargePulse()
+        lantern.pulse = 1
         switch id {
         case StepID.cream: cream()
         case StepID.clean: clean()
@@ -59,6 +63,7 @@ final class StepVisuals {
         rig.glow?.setVisible(false)
         rig.glow?.setExtent(charge: 0)
         rig.glow?.setPulse(0)
+        rig.setMotes(false)
         glowPulse = 0
         lantern.apply(.dark)
     }
@@ -70,6 +75,7 @@ final class StepVisuals {
         rig.glow?.setVisible(true)
         rig.disc.components[OpacityComponent.self]?.opacity = 0
         rig.setDisc(tint: PortRig.portBlue, emissive: 0.2)
+        rig.setMotes(true)
     }
 
     /// Port polished: frost shimmer.
@@ -120,11 +126,13 @@ final class StepVisuals {
         flow.hide()
         rig.disc.components[OpacityComponent.self]?.opacity = 0
         rig.mark.components[OpacityComponent.self]?.opacity = 1
+        // The golden motes stay, drifting from the badge.
     }
 
     // MARK: Per frame
 
-    func update(now: TimeInterval, charge: Float, isCharging: Bool, portWorld: SIMD3<Float>?, socketWorld: SIMD3<Float>) {
+    func update(now: TimeInterval, charge: Float, isCharging: Bool, portWorld: SIMD3<Float>?, portUp: SIMD3<Float>,
+                socketWorld: SIMD3<Float>) {
         let dt = Float(max(0, min(0.1, now - lastUpdate)))
         lastUpdate = now
         let t = now - enteredAt
@@ -157,6 +165,7 @@ final class StepVisuals {
             flow.setSpark(u < 1 ? u : nil)
             if u >= 1 { lantern.apply(.charging(level: max(charge, 0.02))) }
         case StepID.charge:
+            lantern.pulse = Float(chargePulse.advance(dt: Double(dt), level: Double(charge), visuals: config))
             lantern.apply(.charging(level: charge))
             rig.setRingFill(charge)
             rig.glow?.setExtent(charge: charge)
@@ -166,15 +175,18 @@ final class StepVisuals {
             let u = Float(min(1, t / config.markFade))
             rig.mark.components[OpacityComponent.self]?.opacity = u
             rig.disc.components[OpacityComponent.self]?.opacity = 1 - u
+            rig.setMarkGlow(config.markGlow(at: now))
+        case SessionMarker.complete:
+            rig.setMarkGlow(config.markGlow(at: now))
         default:
             break
         }
 
         if let portWorld {
-            flow.update(socket: socketWorld, port: portWorld, flowing: isCharging,
-                        showPackets: stepId == StepID.charge, dt: dt, now: now)
+            flow.update(target: socketWorld, port: portWorld, portUp: portUp, flowing: isCharging,
+                        showFlow: stepId == StepID.charge, dt: dt, now: now)
         } else {
-            flow.update(socket: socketWorld, port: socketWorld, flowing: false, showPackets: false, dt: dt, now: now)
+            flow.update(target: socketWorld, port: socketWorld, portUp: portUp, flowing: false, showFlow: false, dt: dt, now: now)
         }
     }
 

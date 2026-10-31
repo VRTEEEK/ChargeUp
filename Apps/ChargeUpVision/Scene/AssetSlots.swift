@@ -15,8 +15,6 @@ enum AssetSlot: String, CaseIterable {
     case lanternSquare = "lantern_square"
     case portRing = "port_ring"
     case portPlate = "port_plate"
-    case plug = "plug"
-    case spark = "spark"
     case sleeveTile = "sleeve_tile"
     case sleeveTileSoft = "sleeve_tile_soft"
     case chargeMark = "charge_mark"
@@ -35,7 +33,7 @@ enum AssetSlot: String, CaseIterable {
     case lanternSmall = "lantern_small"
 
     /// PNGs are read as images; everything else is a USDZ model.
-    var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark || self == .spark }
+    var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark }
 
     /// port_ring and port_plate are alternatives, not layers: the ring is the
     /// arm's port, the plate is the chest's. The other one is never loaded.
@@ -75,6 +73,7 @@ final class AssetCatalog {
     static let glowColorParameter = "glowColor"
     static let glowColorBottomParameter = "glowColorBottom"
     static let glassColorParameter = "glassColor"
+    static let glassOpacityParameter = "glassOpacity"
 
     private var models: [AssetSlot: Entity] = [:]
     private var images: [AssetSlot: CGImage] = [:]
@@ -110,7 +109,7 @@ final class AssetCatalog {
                         do {
                             textures[slot] = try await TextureResource(image: image, withName: slot.rawValue,
                                                                        options: .init(semantic: .color))
-                            if slot == .chargeMark || slot == .spark, let (alpha, extent) = Self.alphaImage(of: image) {
+                            if slot == .chargeMark, let (alpha, extent) = Self.alphaImage(of: image) {
                                 alphaMasks[slot] = try await TextureResource(image: alpha, withName: slot.rawValue + "_alpha",
                                                                              options: .init(semantic: .raw))
                                 spriteExtents[slot] = extent
@@ -243,6 +242,34 @@ final class AssetCatalog {
         }
         return m
     }
+
+    /// A sprite that glows in its own colours: unlit, so it shows the image
+    /// exactly, self-lit and untouched by room shading, at `brightness`
+    /// (0...1) of full. Never brighter than the image itself, so it cannot
+    /// wash out to white the way an emissive boost on top of lit colour does.
+    static func glowSpriteMaterial(_ texture: TextureResource, alpha: TextureResource?, brightness: Float) -> UnlitMaterial {
+        var m = UnlitMaterial()
+        let b = CGFloat(max(0, min(1, brightness)))
+        m.color = .init(tint: UIColor(red: b, green: b, blue: b, alpha: 1), texture: .init(texture))
+        if let alpha {
+            m.blending = .transparent(opacity: .init(scale: 1, texture: .init(alpha)))
+        }
+        return m
+    }
+
+    func spriteTexture(_ slot: AssetSlot) -> (color: TextureResource, alpha: TextureResource?)? {
+        guard let texture = textures[slot] else { return nil }
+        return (texture, alphaMasks[slot])
+    }
+
+    /// The sprite canvas's height over its width.
+    func spriteAspect(_ slot: AssetSlot) -> Float {
+        guard let image = images[slot], image.width > 0 else { return 1 }
+        return Float(image.height) / Float(image.width)
+    }
+
+    /// The fraction of the canvas the sprite's opaque pixels span (width, height).
+    func spriteExtent(_ slot: AssetSlot) -> SIMD2<Float> { spriteExtents[slot] ?? SIMD2(1, 1) }
 
     /// How much to scale a sprite plane so its opaque content fills the
     /// intended size: 1 when the glyph fills the canvas, larger when it does not.

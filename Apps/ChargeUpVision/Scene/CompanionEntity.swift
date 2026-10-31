@@ -9,8 +9,10 @@ import ChargeUpCore
 /// fallback. Idle is a real loop and is the one clip that loops; every
 /// other clip plays once at config.companion.speed (or its override) and
 /// every change, including back into idle, cross-fades over crossfadeS.
-/// Everything it does is a CompanionCue on a sequence row. It reacts to
-/// nothing else.
+/// Everything it does is a CompanionCue on a sequence row, with two
+/// exceptions: it waves back when the child waves (config.companion.wave)
+/// and plays when touched (config.companion.touch), except on the countdown
+/// and the needle.
 @MainActor
 final class CompanionEntity {
     enum Clip: String, CaseIterable {
@@ -79,6 +81,19 @@ final class CompanionEntity {
             clipEntities[clip] = entity
         }
         root.components.set(OpacityComponent(opacity: 0))
+        // Look and pinch target: a capsule standing over its body, in the
+        // model's own units (the root scales it with the monkey). No hover
+        // highlight (it paled the monkey); LookSparkle answers looking.
+        // Off until setPinchable.
+        if config.touch.pinch {
+            let height = config.height, radius = config.height * Float(config.touch.bodyRadius)
+            let capsule = ShapeResource.generateCapsule(height: height, radius: radius)
+                .offsetBy(translation: SIMD3(0, height / 2, 0))
+            root.components.set(CollisionComponent(shapes: [capsule]))
+            var input = InputTargetComponent()
+            input.isEnabled = false
+            root.components.set(input)
+        }
         root.isEnabled = false
         status = "loaded, \(clipResources.count) clips, retargeting"
         AssetCatalog.logger.info("companion: clips \(self.clipResources.keys.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
@@ -175,6 +190,7 @@ final class CompanionEntity {
         c.speed = Float(config.speed(for: clip.rawValue))
         controller = c
         phase = .playing(clip, then: next)
+        onClipStarted?(clip.rawValue)
         if mode == .retargeting, entity === model {
             probe = (clip, now, Self.jointTransforms(of: model))
         }
@@ -259,6 +275,47 @@ final class CompanionEntity {
 
     private func scheduleVariety(after now: TimeInterval) {
         nextVarietyAt = now + Double.random(in: config.chargeVarietyEverySMin...config.chargeVarietyEverySMax)
+    }
+
+    /// Told the name of each clip as it starts (not the idle loop), for its voice.
+    var onClipStarted: ((String) -> Void)?
+    /// Where its voice comes from: the top of its head, in the root's frame.
+    var headTop: SIMD3<Float> { SIMD3(0, config.height, 0) }
+
+    /// Turns look and pinch on or off.
+    func setPinchable(_ on: Bool) {
+        guard var input = root.components[InputTargetComponent.self], input.isEnabled != on else { return }
+        input.isEnabled = on
+        root.components.set(input)
+    }
+
+    /// Whether `entity` is the companion or part of it.
+    func contains(_ entity: Entity) -> Bool {
+        var node: Entity? = entity
+        while let n = node {
+            if n === root { return true }
+            node = n.parent
+        }
+        return false
+    }
+
+    /// On the arm's side of the scene and visible: a session is running.
+    var isPresent: Bool { root.isEnabled }
+
+    /// Answers the child's wave or touch with `clipName` if it can: not while it is
+    /// still walking in, and not over the celebration (heart, cheer); it
+    /// may cut in on idle, a variety clip, listening or looking. Returns
+    /// false when it did not answer, so the wave is not spent.
+    func answer(_ clipName: String, at now: TimeInterval) -> Bool {
+        guard let clip = Clip(rawValue: clipName), clipResources[clip] != nil else { return false }
+        switch phase {
+        case .fadingIn: return false
+        case .playing(let current, let next):
+            if current == .heart || current == .cheer || next == .cheer { return false }
+        case .idle: break
+        }
+        play(clip, then: .idle, at: now)
+        return true
     }
 
     /// Leaving the charge step: no more variety clips.
