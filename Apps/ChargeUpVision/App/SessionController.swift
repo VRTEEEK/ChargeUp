@@ -67,6 +67,7 @@ final class SessionController: ObservableObject {
         loadSky()
         host.onTick = { [weak self] state, now in self?.recordTick(state, at: now) }
         host.onPhaseChanged = { [weak self] state in self?.phaseChanged(state) }
+        host.onResetSky = { [weak self] in self?.resetSky() }
         host.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
         host.channel.objectWillChange.sink { [weak self] in self?.objectWillChange.send() }.store(in: &bag)
     }
@@ -98,9 +99,7 @@ final class SessionController: ObservableObject {
         guard let dir = documentsDirectory else { return }
         do {
             var s = try SessionStore(directory: dir)
-            if s.count == 0, sequence.config.sky.seededSessions > 0 {
-                try s.seed(count: sequence.config.sky.seededSessions, variant: sequence.object)
-            }
+            try s.seedIfEmpty(count: sequence.config.sky.seededSessions, variant: sequence.object)
             store = s
             publishSky()
         } catch {
@@ -188,9 +187,13 @@ final class SessionController: ObservableObject {
     @Published private(set) var companionStatus = "off"
     func noteCompanion(_ status: String) { companionStatus = status }
 
+    @Published private(set) var treeStatus = "off"
+    func noteTree(_ status: String) { treeStatus = status }
+
     /// Called by the operator window before opening the space.
     func loadAssets() async {
-        await assets.load(accessSite: sequence.config.accessSite, companionEnabled: sequence.config.companion.enabled)
+        await assets.load(accessSite: sequence.config.accessSite, companionEnabled: sequence.config.companion.enabled,
+                          treeEnabled: sequence.config.tree.enabled)
         assetStatus = assets.status
     }
 

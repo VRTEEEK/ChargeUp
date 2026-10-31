@@ -365,9 +365,14 @@ public struct VisualsConfig: Codable, Equatable, Sendable {
     public var cableRetractMs: Int
     /// release: the mark fades onto the dressing over this long.
     public var markFadeMs: Int
-    /// charge: energy packets along the cable, and their speed while flowing.
+    /// charge: energy packets along the cable, and their speed while flowing
+    /// as a fraction of the cable's length per second, so a jittering arm
+    /// that stretches or shortens the cable does not change their pace.
     public var flowPacketCount: Int
-    public var flowSpeedMps: Double
+    public var flowCableFractionPerSecond: Double
+    /// Each spark fades in over this first fraction of the cable and out over
+    /// the same last fraction, so none pops at either end.
+    public var flowFadeFraction: Double
     /// swab: sparkles orbiting the port.
     public var frostSparkleCount: Int
     /// The cable: core and halo diameters, halo opacity, sag at mid-span, colour.
@@ -377,10 +382,13 @@ public struct VisualsConfig: Codable, Equatable, Sendable {
     public var cableSagM: Double
     /// "#RRGGBB".
     public var cableColor: String
+    /// The cable meets the lantern at the top centre, this far above the cap.
+    public var cableSocketAboveCapMm: Double
 
     public var cableCore: Float { Float(cableCoreMm / 1000) }
     public var cableHalo: Float { Float(cableHaloMm / 1000) }
     public var cableSag: Float { Float(cableSagM) }
+    public var cableSocketAboveCap: Float { Float(cableSocketAboveCapMm / 1000) }
     /// 0...1 components of cableColor.
     public var cableRGB: SIMD3<Float> {
         var hex = cableColor
@@ -433,6 +441,16 @@ public struct LanternConfig: Codable, Equatable, Sendable {
     public var glowCharging: Double
     public var glowGlance: Double
     public var glowLit: Double
+    /// The light inside a designed lantern rises as a gradient: lightColorBottom
+    /// at the base of its Glass mesh to lightColorTop at the top. glassColor
+    /// tints the glass itself, lit or not. Hex, "#RRGGBB".
+    public var lightColorBottom: String
+    public var lightColorTop: String
+    public var glassColor: String
+
+    public var lightBottomRGB: SIMD3<Float> { hexRGB(lightColorBottom) ?? SIMD3(1, 0.42, 0.04) }
+    public var lightTopRGB: SIMD3<Float> { hexRGB(lightColorTop) ?? SIMD3(1, 0.8, 0.15) }
+    public var glassRGB: SIMD3<Float> { hexRGB(glassColor) ?? SIMD3(1, 0.86, 0.6) }
 
     public var forward: Float { Float(forwardM) }
     public var belowHead: Float { Float(belowHeadM) }
@@ -453,6 +471,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
     public var audio: AudioConfig
     public var lantern: LanternConfig
     public var sky: SkyConfig
+    public var tree: TreeConfig
     public var charge: ChargeConfig
     public var stillnessThresholdMps: Double
     public var stillnessWindowMs: Int
@@ -483,6 +502,7 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         audio = try c.decode(AudioConfig.self, forKey: .audio)
         lantern = try c.decode(LanternConfig.self, forKey: .lantern)
         sky = try c.decode(SkyConfig.self, forKey: .sky)
+        tree = try c.decode(TreeConfig.self, forKey: .tree)
         charge = try c.decode(ChargeConfig.self, forKey: .charge)
         stillnessThresholdMps = try c.decode(Double.self, forKey: .stillnessThresholdMps)
         stillnessWindowMs = try c.decode(Int.self, forKey: .stillnessWindowMs)
@@ -505,9 +525,11 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .rampDurationMs, in: c, debugDescription: "rampDurationMs must be > 0")
         }
-        guard lantern.glowDark >= 0, lantern.glowCharging >= 0, lantern.glowGlance >= 0, lantern.glowLit >= 0 else {
+        guard lantern.glowDark >= 0, lantern.glowCharging >= 0, lantern.glowGlance >= 0, lantern.glowLit >= 0,
+              hexRGB(lantern.lightColorBottom) != nil, hexRGB(lantern.lightColorTop) != nil,
+              hexRGB(lantern.glassColor) != nil else {
             throw DecodingError.dataCorruptedError(
-                forKey: .lantern, in: c, debugDescription: "lantern glow values must be >= 0")
+                forKey: .lantern, in: c, debugDescription: "lantern glow values must be >= 0 and its colours #RRGGBB")
         }
         guard sky.seededSessions >= 0, sky.riseSeconds > 0, sky.smallScale > 0 else {
             throw DecodingError.dataCorruptedError(
@@ -547,12 +569,17 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
         }
         guard visuals.countdownPulseCount > 0, visuals.countdownPulseMs > 0, visuals.cableSnapMs > 0,
               visuals.cableRetractMs > 0, visuals.markFadeMs > 0, visuals.creamGlowMs > 0, visuals.flushSparkMs > 0,
-              visuals.flowPacketCount > 0, visuals.flowSpeedMps > 0,
+              visuals.flowPacketCount > 0, visuals.flowCableFractionPerSecond > 0,
+              (0...0.5).contains(visuals.flowFadeFraction), visuals.cableSocketAboveCapMm >= 0,
               visuals.cableCoreMm > 0, visuals.cableHaloMm >= visuals.cableCoreMm,
               (0...1).contains(visuals.cableHaloOpacity), visuals.cableSagM >= 0,
               visuals.cableColor.count == 7, visuals.cableColor.hasPrefix("#") else {
             throw DecodingError.dataCorruptedError(
                 forKey: .visuals, in: c, debugDescription: "visuals config values must be > 0")
+        }
+        guard tree.validate() else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .tree, in: c, debugDescription: "tree config out of range or hooks malformed")
         }
         guard forearm.holdLastPoseMs >= 0, forearm.fadeMs > 0, forearm.filterMaxStepMs > 0,
               (0...1).contains(forearm.occludedOpacity), forearm.filterMinCutoffHz > 0,
@@ -657,7 +684,7 @@ public struct ChargeSequence: Codable, Equatable, Sendable {
         for step in steps {
             guard seen.insert(step.id).inserted else { throw SequenceError.duplicateStepId(step.id) }
         }
-        for required in [StepID.countdown, StepID.charge] where !seen.contains(required) {
+        for required in [StepID.countdown, StepID.charge, config.tree.touch.fromStep] where !seen.contains(required) {
             throw SequenceError.missingStep(required)
         }
         for id in steps.map(\.id) + [SessionMarker.idle, SessionMarker.complete] {

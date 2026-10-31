@@ -29,6 +29,8 @@ public final class SessionHost: ObservableObject {
     public var onPhaseChanged: ((SessionState) -> Void)?
     /// Called on every host tick (10 Hz) with the state and the host clock.
     public var onTick: ((SessionState, TimeInterval) -> Void)?
+    /// A nurse asked to clear the saved sky. The app owns the store.
+    public var onResetSky: (() -> Void)?
 
     private var ticker: Task<Void, Never>?
     private static let tickInterval: Duration = .milliseconds(100)
@@ -137,6 +139,9 @@ public final class SessionHost: ObservableObject {
         switch message {
         case .hello, .presence, .skyState:
             break
+        case .resetSky:
+            guard peer.role == .nurse else { return }
+            onResetSky?()
         case .reset:
             reset()
         case .connect(let nurseTimestamp):
@@ -230,6 +235,9 @@ public final class SessionMirror: ObservableObject {
 
     public func sendReset() { channel.send(.reset) }
 
+    /// Nurse only: ask the headset to clear its saved sky back to the seeded lanterns.
+    public func sendResetSky() { channel.send(.resetSky) }
+
     private var nextStepId: String? {
         if isIdle { return sequence.steps.first?.id }
         guard let i = currentIndex else { return nil }
@@ -238,7 +246,7 @@ public final class SessionMirror: ObservableObject {
 
     private func receive(_ message: Message) {
         switch message {
-        case .hello, .connect:
+        case .hello, .connect, .resetSky:
             break
         case .skyState(let sessions):
             self.sessions = sessions.sorted { $0.date < $1.date }

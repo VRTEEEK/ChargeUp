@@ -101,6 +101,8 @@ struct OperatorWindow: View {
                 .font(.footnote)
             LabeledContent("Companion", value: controller.companionStatus)
                 .font(.footnote)
+            LabeledContent("Tree", value: controller.treeStatus)
+                .font(.footnote)
             LabeledContent("Recording", value: controller.lastRecording)
             LabeledContent("Sky") {
                 HStack {

@@ -41,6 +41,17 @@ import Testing
         #expect(store.records.last!.date.timeIntervalSince(now) == -3 * 7 * 24 * 3600, "latest seed is three weeks ago")
     }
 
+    @Test func seedIfEmptyNeverGrowsASavedSky() throws {
+        let dir = try tempDir()
+        var store = try SessionStore(directory: dir)
+        #expect(try store.seedIfEmpty(count: 6, variant: "lantern"))
+        try store.append(SessionRecord(date: Date(), variant: "lantern", fill: 0.9))
+        // A relaunch: the saved sky has lanterns, so nothing is added.
+        var relaunched = try SessionStore(directory: dir)
+        #expect(try !relaunched.seedIfEmpty(count: 6, variant: "lantern"))
+        #expect(try SessionStore(directory: dir).count == 7)
+    }
+
     @Test func resetClearsThenReseeds() throws {
         let dir = try tempDir()
         var store = try SessionStore(directory: dir)

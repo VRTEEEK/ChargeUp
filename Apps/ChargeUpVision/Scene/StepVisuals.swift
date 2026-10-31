@@ -9,7 +9,9 @@ import ChargeUpCore
 final class StepVisuals {
     private let config: VisualsConfig
     private let rig: PortRig
-    private let lantern: ChargeObjectEntity
+    /// The current session's lantern. Replaced by SceneDirector after the
+    /// previous one has flown into the sky.
+    var lantern: ChargeObjectEntity
     private let flow: EnergyFlow
 
     private var stepId = SessionMarker.idle

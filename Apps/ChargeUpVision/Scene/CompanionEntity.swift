@@ -50,6 +50,9 @@ final class CompanionEntity {
     private var phase: Phase = .idle
     private var probe: (clip: Clip, started: TimeInterval, before: [Transform])?
     private var side: Float = 1
+    /// Turn about the vertical, toward the child; nil until first faced, so
+    /// the first turn snaps instead of spinning in.
+    private var yaw: Float?
     /// 0 = no variety, >0 = due at that time, -1 = a variety clip is running.
     private var nextVarietyAt: TimeInterval = 0
     private var lastVariety: Clip?
@@ -97,6 +100,27 @@ final class CompanionEntity {
         root.position = SIMD3(side * (lanternHalfWidth + config.gap + halfWidth), lanternBaseY, 0)
     }
 
+    /// Under the lantern tree (the caller parents it to the tree's frame):
+    /// on the floor in front of the trunk, on the side away from the nurse,
+    /// scaled up from config.heightM to `height` so it reads at that distance.
+    func placeUnderTree(forward: Float, sideOffset: Float, height: Float, heldArm: HeldArm) {
+        side = heldArm == .left ? 1 : -1
+        root.scale = SIMD3(repeating: height / max(0.001, config.height))
+        root.position = SIMD3(side * sideOffset, 0, forward)
+    }
+
+    /// Turn the body to face `target` (world space) across the floor, at
+    /// most `maxStep` radians this call; the first call snaps. The clips play
+    /// on underneath, so only the facing changes.
+    func face(_ target: SIMD3<Float>, maxStep: Float) {
+        guard let parent = root.parent else { return }
+        let local = parent.convert(position: target, from: nil)
+        let next = TreePlacement.faceYaw(current: yaw ?? 0, position: root.position, target: local,
+                                         maxStep: yaw == nil ? .pi : maxStep)
+        yaw = next
+        root.orientation = simd_quatf(angle: next, axis: SIMD3(0, 1, 0))
+    }
+
     // MARK: Cues
 
     func enter(_ cue: CompanionCue, at now: TimeInterval) {
@@ -125,6 +149,7 @@ final class CompanionEntity {
 
     func reset() {
         root.isEnabled = false
+        yaw = nil
         root.components[OpacityComponent.self]?.opacity = 0
         nextVarietyAt = 0
         lastVariety = nil

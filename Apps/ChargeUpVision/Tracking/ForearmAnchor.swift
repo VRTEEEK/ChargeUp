@@ -21,10 +21,19 @@ final class ForearmAnchor: ObservableObject {
     @Published private(set) var lastError = ""
 
     private let config: ForearmConfig
-    private let session = ARKitSession()
-    private let provider = HandTrackingProvider()
+    /// A fresh session and provider on every start: ARKit throws (and the
+    /// app aborts) if a data provider that was stopped is run again, which
+    /// is what reopening the immersive space used to do.
+    private var session = ARKitSession()
+    private var provider = HandTrackingProvider()
     private var tracker: ForearmTracker
     private var updates: Task<Void, Never>?
+    /// Each tracked hand's touch points in world space, from its latest
+    /// update; a hand drops out when ARKit loses it.
+    private var handPoints: [HandAnchor.Chirality: [SIMD3<Float>]] = [:]
+    private static let touchJoints: [HandSkeleton.JointName] = [
+        .thumbTip, .indexFingerTip, .middleFingerTip, .ringFingerTip, .littleFingerTip, .middleFingerKnuckle,
+    ]
 
     init(config: ForearmConfig) {
         self.config = config
@@ -41,6 +50,10 @@ final class ForearmAnchor: ObservableObject {
             status = .unauthorized
             return
         }
+        session.stop()
+        session = ARKitSession()
+        provider = HandTrackingProvider()
+        let provider = self.provider
         do {
             try await session.run([provider])
         } catch {
@@ -64,7 +77,12 @@ final class ForearmAnchor: ObservableObject {
         updates = nil
         session.stop()
         tracker.reset()
+        handPoints = [:]
         status = .idle
+    }
+
+    func touchPoints(now: TimeInterval) -> [SIMD3<Float>] {
+        handPoints.values.flatMap { $0 }
     }
 
     /// Called once per rendered frame by the scene. Returns nil until the
@@ -90,6 +108,7 @@ final class ForearmAnchor: ObservableObject {
 
     private func handle(_ update: AnchorUpdate<HandAnchor>) {
         let anchor = update.anchor
+        recordTouchPoints(update)
         guard anchor.chirality == heldChirality else { return }
         let now = CACurrentMediaTime()
         guard update.event != .removed, anchor.isTracked, let skeleton = anchor.handSkeleton else {
@@ -107,5 +126,20 @@ final class ForearmAnchor: ObservableObject {
                                           arm: origin * arm.anchorFromJointTransform,
                                           config: config)
         tracker.observe(raw, at: now)
+    }
+
+    /// Both hands, not just the held one: either can touch a lantern.
+    private func recordTouchPoints(_ update: AnchorUpdate<HandAnchor>) {
+        let anchor = update.anchor
+        guard update.event != .removed, anchor.isTracked, let skeleton = anchor.handSkeleton else {
+            handPoints[anchor.chirality] = nil
+            return
+        }
+        let origin = anchor.originFromAnchorTransform
+        handPoints[anchor.chirality] = Self.touchJoints.compactMap { name in
+            let joint = skeleton.joint(name)
+            guard joint.isTracked else { return nil }
+            return ForearmPoseSolver.translation(of: origin * joint.anchorFromJointTransform)
+        }
     }
 }

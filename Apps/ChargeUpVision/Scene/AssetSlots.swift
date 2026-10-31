@@ -30,6 +30,9 @@ enum AssetSlot: String, CaseIterable {
     case companionClipFidget = "companion_clip_fidget"
     case companionClipHeart = "companion_clip_heart"
     case companionClipCheer = "companion_clip_cheer"
+    case lanternTree = "lantern_tree"
+    /// A lighter copy of the hero lantern for the many that hang on the tree.
+    case lanternSmall = "lantern_small"
 
     /// PNGs are read as images; everything else is a USDZ model.
     var isImage: Bool { self == .sleeveTile || self == .sleeveTileSoft || self == .portMarker || self == .chargeMark || self == .spark }
@@ -44,8 +47,9 @@ enum AssetSlot: String, CaseIterable {
         }
     }
 
-    func applies(to site: AccessSite, companionEnabled: Bool) -> Bool {
+    func applies(to site: AccessSite, companionEnabled: Bool, treeEnabled: Bool = true) -> Bool {
         if isCompanion { return companionEnabled }
+        if self == .lanternTree { return treeEnabled }
         switch self {
         case .portRing: return site == .arm
         case .portPlate: return site == .chestPort
@@ -69,6 +73,8 @@ final class AssetCatalog {
     static let fillParameter = "fill"
     static let glowIntensityParameter = "glowIntensity"
     static let glowColorParameter = "glowColor"
+    static let glowColorBottomParameter = "glowColorBottom"
+    static let glassColorParameter = "glassColor"
 
     private var models: [AssetSlot: Entity] = [:]
     private var images: [AssetSlot: CGImage] = [:]
@@ -89,13 +95,13 @@ final class AssetCatalog {
 
     /// Try every slot that applies to the access site once. Missing files are
     /// expected; a file that exists but fails to load is reported by name.
-    func load(accessSite: AccessSite, companionEnabled: Bool = false) async {
+    func load(accessSite: AccessSite, companionEnabled: Bool = false, treeEnabled: Bool = false) async {
         guard !loaded else { return }
         var found: [String] = []
         var broken: [String] = []
         var missing: [AssetSlot] = []
-        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite, companionEnabled: companionEnabled) }
-        for slot in AssetSlot.allCases where slot.applies(to: accessSite, companionEnabled: companionEnabled) {
+        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite, companionEnabled: companionEnabled, treeEnabled: treeEnabled) }
+        for slot in AssetSlot.allCases where slot.applies(to: accessSite, companionEnabled: companionEnabled, treeEnabled: treeEnabled) {
             if slot.isImage {
                 if let image = Self.loadImage(named: slot.rawValue) {
                     images[slot] = image

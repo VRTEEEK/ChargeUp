@@ -6,7 +6,9 @@ import ChargeUpCore
 /// The cable of light from the port to the lantern socket, and the sparks
 /// that run along it. A warm core with a soft halo, sagging between its
 /// ends, lit from the port end toward the lantern as `extension_` grows.
-/// Invisible until connect; rebuilt each frame because the port moves.
+/// Invisible until connect. The tube mesh is rebuilt on the cable throttle;
+/// the sparks and the plug follow the analytic curve between the current
+/// endpoints every frame, so they never ride a stale mesh.
 @MainActor
 final class EnergyFlow {
     private static let packetRadius: Float = 0.006
@@ -26,12 +28,14 @@ final class EnergyFlow {
     private(set) var extension_: Float = 0
     private var visible = false
     private var phase: Float = 0
-    private let speed: Float
+    /// Fraction of the cable's length a packet covers per second.
+    private let rate: Float
+    private let fade: Float
     private let config: VisualsConfig
     private let throttle: CableConfig
     private var lastLit: Float = -1
-    /// The curve the last built tube follows; sparks ride this between rebuilds.
-    private var points: [SIMD3<Float>] = []
+    /// True once a tube mesh has been built.
+    private var hasMesh = false
     private var builtPort = SIMD3<Float>(repeating: .nan)
     private var builtSocket = SIMD3<Float>(repeating: .nan)
     private var builtAt: TimeInterval = -1
@@ -43,7 +47,8 @@ final class EnergyFlow {
     init(config: VisualsConfig, cable: CableConfig, assets: AssetCatalog? = nil) {
         self.config = config
         self.throttle = cable
-        speed = Float(config.flowSpeedMps)
+        rate = Float(config.flowCableFractionPerSecond)
+        fade = Float(config.flowFadeFraction)
         let rgb = config.cableRGB
         let color = UIColor(red: CGFloat(rgb.x), green: CGFloat(rgb.y), blue: CGFloat(rgb.z), alpha: 1)
 
@@ -90,12 +95,14 @@ final class EnergyFlow {
             let p = makeSpark(scale: 1)
             p.name = "packet\(i)"
             p.isEnabled = false
+            p.components.set(OpacityComponent(opacity: 0))
             list.append(p)
         }
         packets = list
         spark = makeSpark(scale: 1.6)
         spark.name = "spark"
         spark.isEnabled = false
+        spark.components.set(OpacityComponent(opacity: 0))
         if let designed = assets?.model(.plug) {
             plug = designed
         } else {
@@ -154,11 +161,12 @@ final class EnergyFlow {
             || simd_length(port - builtPort) > throttle.moveThreshold
             || simd_length(socket - builtSocket) > throttle.moveThreshold
         if (moved || litChanged) && now - builtAt >= throttle.minInterval {
-            points = CableMesh.catenaryPoints(from: port, to: socket, sag: config.cableSag, segments: Self.segments)
+            let points = CableCurve(from: port, to: socket, sag: config.cableSag).samples(segments: Self.segments)
             if let coreMesh = CableMesh.tube(along: points, radius: config.cableCore / 2),
                let haloMesh = CableMesh.tube(along: points, radius: config.cableHalo / 2) {
                 core.model?.mesh = coreMesh
                 halo.model?.mesh = haloMesh
+                hasMesh = true
             }
             builtPort = port
             builtSocket = socket
@@ -175,28 +183,35 @@ final class EnergyFlow {
             rebuildCount = 0
             countSince = now
         }
-        guard points.count >= 2 else { return }
+        guard hasMesh else { return }
+        // Everything that rides the cable uses the curve between this
+        // frame's endpoints, not the throttled mesh.
+        let curve = CableCurve(from: port, to: socket, sag: config.cableSag)
         core.isEnabled = true
         halo.isEnabled = true
         plug.isEnabled = true
         plug.position = port
-        plug.orientation = simd_quatf(from: SIMD3(0, 1, 0), to: simd_normalize(points[1] - points[0]))
+        plug.orientation = simd_quatf(from: SIMD3(0, 1, 0), to: curve.tangent(at: 0))
 
         if let sparkProgress {
             spark.isEnabled = true
-            spark.position = CableMesh.point(on: points, at: sparkProgress)
+            spark.position = curve.point(at: sparkProgress)
+            spark.components.set(OpacityComponent(opacity: CableCurve.sparkOpacity(at: sparkProgress, fade: fade)))
         } else {
             spark.isEnabled = false
         }
-        if flowing { phase += speed * dt / length }
+        // Pace is a fraction of the cable per second, so a cable that
+        // stretches with arm jitter does not speed the packets up or down.
+        if flowing { phase += rate * dt }
         phase = phase.truncatingRemainder(dividingBy: 1)
         let show = showPackets && extension_ > 0.99
         for (i, p) in packets.enumerated() {
             p.isEnabled = show
             guard show else { continue }
-            // Packets travel from the port into the lantern.
+            // Packets travel from the port into the lantern, fading in and out at the ends.
             let u = (phase + Float(i) / Float(packets.count)).truncatingRemainder(dividingBy: 1)
-            p.position = CableMesh.point(on: points, at: u)
+            p.position = curve.point(at: u)
+            p.components.set(OpacityComponent(opacity: CableCurve.sparkOpacity(at: u, fade: fade)))
         }
     }
 }

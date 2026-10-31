@@ -16,6 +16,9 @@ public enum Message: Equatable, Sendable {
     /// The lantern sky: every completed session on the headset. Sent to a
     /// companion when it joins and after each release.
     case skyState(sessions: [SessionRecord])
+    /// Operator only, from a nurse: clear the saved sky back to the seeded
+    /// lanterns. Honoured by the host only from a peer that said hello as nurse.
+    case resetSky
 
     public var typeName: String {
         switch self {
@@ -25,6 +28,7 @@ public enum Message: Equatable, Sendable {
         case .presence: return "presence"
         case .reset: return "reset"
         case .skyState: return "skyState"
+        case .resetSky: return "resetSky"
         }
     }
 }
@@ -53,6 +57,8 @@ extension Message: Codable {
             self = .reset
         case "skyState":
             self = .skyState(sessions: try c.decode([SessionRecord].self, forKey: .sessions))
+        case "resetSky":
+            self = .resetSky
         default:
             throw DecodingError.dataCorruptedError(
                 forKey: .type, in: c, debugDescription: "unknown message type '\(type)'")
@@ -74,7 +80,7 @@ extension Message: Codable {
             try c.encode(headOnPort, forKey: .headOnPort)
             try c.encode(armStill, forKey: .armStill)
             try c.encode(charge, forKey: .charge)
-        case .reset:
+        case .reset, .resetSky:
             break
         case .skyState(let sessions):
             try c.encode(sessions, forKey: .sessions)

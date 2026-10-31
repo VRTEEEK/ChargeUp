@@ -123,6 +123,13 @@ import Testing
         nurse.tapButton()
         #expect(await waitUntil(Self.messageTimeout) { nurse.isIdle })
         #expect(host.state.phase == .idle)
+
+        // Reset Sky from the nurse reaches the app's hook; the session is untouched.
+        var skyResets = 0
+        host.onResetSky = { skyResets += 1 }
+        nurse.sendResetSky()
+        #expect(await waitUntil(Self.messageTimeout) { skyResets == 1 })
+        #expect(host.state.phase == .idle)
     }
 }
 

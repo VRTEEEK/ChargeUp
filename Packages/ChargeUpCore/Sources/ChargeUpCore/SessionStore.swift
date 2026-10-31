@@ -60,6 +60,16 @@ public struct SessionStore: Sendable {
         try save()
     }
 
+    /// Seeds `count` fake sessions only when the saved sky is empty, so a
+    /// headset used for testing does not grow by a seed set on every launch.
+    /// Returns true if it seeded.
+    @discardableResult
+    public mutating func seedIfEmpty(count: Int, variant: String, now: Date = Date()) throws -> Bool {
+        guard records.isEmpty, count > 0 else { return false }
+        try seed(count: count, variant: variant, now: now)
+        return true
+    }
+
     /// Clears the sky, then writes `seed` fake sessions if asked.
     public mutating func reset(seeding seed: Int = 0, variant: String, now: Date = Date()) throws {
         records = []

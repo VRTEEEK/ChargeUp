@@ -19,6 +19,7 @@ The first run builds it (about 10 s). It browses for `_chargeup._tcp`, links as 
 | space | the nurse button: START, Next, NEEDLE OUT, DONE, RESET |
 | return | CONNECT, only on the countdown step |
 | r | reset |
+| k | reset sky: clears the headset's saved lanterns back to the seeded set |
 | q or ctrl-c | quit; writes the message log to `~/Documents/chargeup-macnurse-<date>.csv` |
 
 The CSV has the same columns as the iPad's Export log (localTimestamp, direction, peer, seq, type, stepId, hostTimestamp), so the Milestone 1 round-trip check reads the same way: the `sent,connect` row and the next `received,stepChanged,connect` row.

@@ -15,6 +15,7 @@ import Testing
             SessionRecord(date: Date(timeIntervalSince1970: 1_701_000_000), variant: "lantern", fill: 0.8, seeded: true),
         ]),
         .skyState(sessions: []),
+        .resetSky,
     ]
 
     @Test(arguments: everyCase) func roundTrips(_ message: Message) throws {

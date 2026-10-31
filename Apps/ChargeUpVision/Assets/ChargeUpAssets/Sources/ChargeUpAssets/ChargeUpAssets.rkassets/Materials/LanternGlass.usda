@@ -33,11 +33,21 @@ def Xform "Root"
                 }
             }
         )
-        color3f inputs:glowColor = (1, 0.78, 0.35) (
+        // The light is a gradient up the glass: glowColorBottom at baseY,
+        // glowColor at the top. The app sets both from config.lantern.
+        color3f inputs:glowColor = (1, 0.8, 0.15) (
             customData = {
                 dictionary realitykit = {
                     float2 positionInSubgraph = (-900, 260)
                     int stackingOrderInSubgraph = 3
+                }
+            }
+        )
+        color3f inputs:glowColorBottom = (1, 0.42, 0.04) (
+            customData = {
+                dictionary realitykit = {
+                    float2 positionInSubgraph = (-900, 860)
+                    int stackingOrderInSubgraph = 9
                 }
             }
         )
@@ -49,7 +59,7 @@ def Xform "Root"
                 }
             }
         )
-        color3f inputs:glassColor = (0.85, 0.92, 1) (
+        color3f inputs:glassColor = (1, 0.86, 0.6) (
             customData = {
                 dictionary realitykit = {
                     float2 positionInSubgraph = (-900, 460)
@@ -150,10 +160,30 @@ def Xform "Root"
             float2 ui:nodegraph:node:pos = (-180, 60)
         }
 
+        def Shader "Height01"
+        {
+            uniform token info:id = "ND_clamp_float"
+            float inputs:in.connect = </Root/LanternGlass/Normalised.outputs:out>
+            float inputs:low = 0
+            float inputs:high = 1
+            float outputs:out
+            float2 ui:nodegraph:node:pos = (-420, 360)
+        }
+
+        def Shader "Gradient"
+        {
+            uniform token info:id = "ND_mix_color3"
+            color3f inputs:bg.connect = </Root/LanternGlass.inputs:glowColorBottom>
+            color3f inputs:fg.connect = </Root/LanternGlass.inputs:glowColor>
+            float inputs:mix.connect = </Root/LanternGlass/Height01.outputs:out>
+            color3f outputs:out
+            float2 ui:nodegraph:node:pos = (-420, 260)
+        }
+
         def Shader "Glow"
         {
             uniform token info:id = "ND_multiply_color3FA"
-            color3f inputs:in1.connect = </Root/LanternGlass.inputs:glowColor>
+            color3f inputs:in1.connect = </Root/LanternGlass/Gradient.outputs:out>
             float inputs:in2.connect = </Root/LanternGlass.inputs:glowIntensity>
             color3f outputs:out
             float2 ui:nodegraph:node:pos = (-340, 260)

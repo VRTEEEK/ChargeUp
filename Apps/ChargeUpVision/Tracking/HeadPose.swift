@@ -6,14 +6,17 @@ import QuartzCore
 /// attention proxy (Milestone 2 task 4); that is a separate, untouched task.
 @MainActor
 final class HeadPose {
-    private let session = ARKitSession()
-    private let provider = WorldTrackingProvider()
+    /// Fresh on every start: a stopped provider cannot be run again.
+    private var session = ARKitSession()
+    private var provider = WorldTrackingProvider()
     private var running = false
 
     var isSupported: Bool { WorldTrackingProvider.isSupported }
 
     func start() async {
         guard !running, isSupported else { return }
+        session = ARKitSession()
+        provider = WorldTrackingProvider()
         do {
             try await session.run([provider])
             running = true

@@ -11,6 +11,7 @@ final class NurseConsole {
     let sequence: ChargeSequence
     let mirror: SessionMirror
     private var lastPresence: (head: Bool, still: Bool)?
+    private var lastSkyCount = -1
     private var lastLinked = false
     private var stdinSource: DispatchSourceRead?
     private var originalTermios = termios()
@@ -41,6 +42,10 @@ final class NurseConsole {
         Task { @MainActor [weak self] in
             while let self {
                 try? await Task.sleep(for: .milliseconds(200))
+                if self.mirror.channel.isConnected, self.mirror.sessions.count != self.lastSkyCount {
+                    self.lastSkyCount = self.mirror.sessions.count
+                    self.line("sky  \(self.lastSkyCount) lanterns")
+                }
                 let now = (self.mirror.headOnPort, self.mirror.armStill)
                 if self.lastPresence == nil || self.lastPresence! != now {
                     self.lastPresence = now
@@ -87,6 +92,10 @@ final class NurseConsole {
             guard mirror.channel.isConnected else { return line("not linked yet") }
             line("reset")
             mirror.sendReset()
+        case UInt8(ascii: "k"), UInt8(ascii: "K"):
+            guard mirror.channel.isConnected else { return line("not linked yet") }
+            line("reset sky (back to the seeded lanterns)")
+            mirror.sendResetSky()
         case UInt8(ascii: "q"), UInt8(ascii: "Q"), 0x03:
             quit()
         default:
@@ -109,9 +118,9 @@ final class NurseConsole {
     private func showPrompt() {
         let label = mirror.buttonLabel
         if mirror.currentStepId == StepID.countdown {
-            line("  [return] \(label)   [r] reset   [q] quit")
+            line("  [return] \(label)   [r] reset   [k] reset sky   [q] quit")
         } else {
-            line("  [space] \(label)   [r] reset   [q] quit")
+            line("  [space] \(label)   [r] reset   [k] reset sky   [q] quit")
         }
     }
 

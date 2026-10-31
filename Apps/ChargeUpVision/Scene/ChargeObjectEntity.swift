@@ -28,6 +28,8 @@ final class ChargeObjectEntity {
     /// Emissive levels for designed lanterns, from config.lantern. Set once by
     /// SceneDirector before any lantern is built.
     nonisolated(unsafe) static var glowLevels = (dark: Float(0.3), charging: Float(6), glance: Float(5), lit: Float(9))
+    /// The designed lantern's light gradient and glass tint, from config.lantern.
+    nonisolated(unsafe) static var lightColors = (bottom: UIColor.orange, top: UIColor.yellow, glass: UIColor.white)
 
     let root = Entity()
     /// Everything visible hangs off `body`, so the lantern can rise while
@@ -56,15 +58,17 @@ final class ChargeObjectEntity {
     var baseY: Float { modelBounds.map { -($0.max.y - $0.min.y) / 2 } ?? -(Self.bodyHeight / 2 + Self.capHeight) }
     var halfWidth: Float { modelBounds.map { ($0.max.x - $0.min.x) / 2 } ?? (Self.bodyRadius + 0.006) }
 
-    /// Where the cable leaves the lantern, in the lantern's local frame: just
-    /// under the cap at the front. From the model's bounds when designed.
-    var cableSocket: SIMD3<Float> {
-        if let b = modelBounds {
-            let h = b.max.y - b.min.y
-            return body.convert(position: SIMD3(0, h * 0.36, (b.max.z - b.min.z) * 0.5), to: root)
-        }
-        return body.convert(position: SIMD3(0, Self.capHeight / 2, Self.bodyRadius), to: root)
+    /// Where the cable meets the lantern, in the root frame: the top centre,
+    /// `aboveCap` metres above the highest point of the cap. From the
+    /// model's bounds when designed (the model is centred on the body).
+    func cableSocket(aboveCap: Float) -> SIMD3<Float> {
+        body.convert(position: SIMD3(0, topY + aboveCap, 0), to: root)
     }
+
+    /// Full height at scale 1, and the distance from the body origin up to
+    /// the very top (the ring a hung lantern hangs by).
+    var height: Float { modelBounds.map { $0.max.y - $0.min.y } ?? (Self.bodyHeight + 2 * Self.capHeight) }
+    var topY: Float { height / 2 }
 
     /// - Parameter model: a clone from `AssetCatalog.model(.lanternHero)` or a
     ///   variant, already carrying the Glass shader; nil for the placeholder.
@@ -128,6 +132,10 @@ final class ChargeObjectEntity {
             let glass = AssetCatalog.glassBounds(in: model) ?? bounds
             AssetCatalog.setParameter("baseY", glass.min.y, in: model)
             AssetCatalog.setParameter("height", max(0.001, glass.max.y - glass.min.y), in: model)
+            let colors = Self.lightColors
+            AssetCatalog.setColorParameter(AssetCatalog.glowColorBottomParameter, colors.bottom, in: model)
+            AssetCatalog.setColorParameter(AssetCatalog.glowColorParameter, colors.top, in: model)
+            AssetCatalog.setColorParameter(AssetCatalog.glassColorParameter, colors.glass, in: model)
         }
 
         apply(.dark)

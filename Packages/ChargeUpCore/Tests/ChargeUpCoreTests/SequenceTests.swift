@@ -69,11 +69,14 @@ import Testing
         #expect(seq.config.cable.rebuildHz == 30)
         #expect(abs(seq.config.cable.minInterval - 1.0 / 30) < 1e-9)
         #expect(seq.config.cable.moveThreshold == 0.002)
+        #expect(seq.config.visuals.flowCableFractionPerSecond == 1.25)
+        #expect(seq.config.visuals.flowFadeFraction == 0.1)
+        #expect(abs(seq.config.visuals.cableSocketAboveCap - 0.004) < 1e-9)
     }
 
-    @Test func companionCuesPerStepAndOffByDefault() throws {
+    @Test func companionCuesPerStepAndOnForTheDemo() throws {
         let seq = try ChargeSequence.shipped()
-        #expect(!seq.config.companion.enabled)
+        #expect(seq.config.companion.enabled)
         #expect(seq.config.companion.heightM == 0.22)
         #expect(seq.step(id: StepID.cream)?.companion == .waveIn)
         #expect(seq.step(id: StepID.countdown)?.companion == .listen)
@@ -104,6 +107,23 @@ import Testing
         #expect(v.countdownPulseMs == 800, "three pulses of light, 800 ms apart")
         #expect(v.cableSnap < v.cableRetract)
         #expect(v.flushSpark > 0)
+    }
+
+    @Test func lanternLightIsOrangeToYellow() throws {
+        let l = try ChargeSequence.shipped().config.lantern
+        #expect(l.lightBottomRGB.x == 1 && l.lightTopRGB.x == 1)
+        #expect(l.lightBottomRGB.y < l.lightTopRGB.y, "orange at the base, yellow at the top")
+        #expect(l.lightBottomRGB.z < 0.2 && l.lightTopRGB.z < 0.2, "warm, not white")
+    }
+
+    @Test func badLanternColourFails() throws {
+        var json = try shippedJSON()
+        var config = json["config"] as! [String: Any]
+        var lantern = config["lantern"] as! [String: Any]
+        lantern["lightColorTop"] = "yellow"
+        config["lantern"] = lantern
+        json["config"] = config
+        #expect(throws: DecodingError.self) { try load(json) }
     }
 
     @Test func audioConfigAndIds() throws {

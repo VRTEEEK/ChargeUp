@@ -29,7 +29,7 @@ struct ImmersiveView: View {
             director?.placeLantern(head: head)
             controller.noteLanternPlacement(fromHeadPose: head != nil,
                                             head: head.map { ForearmPoseSolver.translation(of: $0) },
-                                            lantern: director?.lantern.root.position ?? .zero)
+                                            lantern: director?.anchor.position ?? .zero)
         }
         .onDisappear {
             controller.portSource.stop()

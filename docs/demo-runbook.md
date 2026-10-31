@@ -12,6 +12,10 @@ For the person running the demo and for the judge who plays the nurse. Nothing h
 - A chair for the volunteer, a stool for the nurse at the volunteer's left side.
 - If the chest-port build is ever used on a device: the printed marker (docs/port-marker.pdf at 100 %, 50 mm square) and tape. Not for this demo; the arm is the default.
 
+## Space
+
+The lantern tree stands 2.5 m in front of the child and spreads about 1.35 m around its trunk (its roots reach about 1.3 m toward the child), so it needs roughly 3.9 m of clear floor ahead of the chair and about 2.5 m to either side. In a smaller bay it will pass through the wall; shorten `config.tree.forwardM` in sequence.json (the hooks were computed for 2.5 m and stay valid a little closer). The monkey stands under it, in front of the roots, on the side away from the held arm.
+
 ## Power and pairing order
 
 1. iPad on, Personal Hotspot on, Wi-Fi off on every other device.
@@ -57,7 +61,7 @@ On the iPad, the **Rehearsal** toggle taps the button every 3 s and loops. Use i
 | Port disc is dim or frozen | The headset lost the forearm (a hand over the wrist). It holds the last place for 2 s then dims to half; it recovers on its own. Do not move the arm to "help". |
 | Port is on the wrong side of the arm | Operator: `config.forearm.dorsalAxis` in sequence.json, flip the sign. Rebuild. Not a demo-day fix. |
 | No haptics | Check the iPhone is in the Haptic role with a green dot and the volume is up. The pulse and ramp are driven by step changes; tap RESET then START to retrigger. |
-| Sky is empty | Operator window: Reset Sky re-seeds six lanterns. |
+| Sky is empty, or crowded from testing | Operator window: Reset Sky, or `k` on the Mac nurse: clears back to six seeded lanterns. |
 | Headset shows nothing after Start | Operator window Stop, then Start again. If the Forearm line says `unauthorized`, open Settings on the headset and allow hand tracking for Charge Up. |
 | Everything is wrong | Operator window Stop; force-quit all three apps; follow the power and pairing order again. Under 2 minutes. |
 
