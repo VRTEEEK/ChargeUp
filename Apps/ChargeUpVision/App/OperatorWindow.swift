@@ -14,11 +14,15 @@ struct OperatorWindow: View {
     /// seconds, and a second tap must not open the space twice.
     @State private var starting = false
 
-    /// The start screen is the key art at 16:9, with the Start button in the
-    /// clear band between the logo and the podium (fractions of the art).
+    /// The start screen is the key art at 16:9 with the Start button under
+    /// the window, a fraction of the window's width wide and a small gap below it.
     private static let startSize = CGSize(width: 960, height: 540)
-    private static let buttonCentre = CGPoint(x: 0.5, y: 0.725)
     private static let buttonWidth: CGFloat = 0.28
+    /// The art's foreground comes forward out of the window and, seen from
+    /// above, hangs over the strip just below it (about 40 points on the
+    /// headset), so the button sits clear of that and a little forward.
+    private static let buttonGap: CGFloat = 72
+    private static let buttonForward: CGFloat = 40
 
     /// Debug only, default off: `CHARGEUP_AUTOSTART=1` in the environment
     /// presses Start on launch so the simulator can be driven without a click.
@@ -38,32 +42,34 @@ struct OperatorWindow: View {
     }
 
     private var startScreen: some View {
-        let size = Self.startSize
-        return ZStack {
-            Image("StartBackground")
-                .resizable()
-                .aspectRatio(contentMode: .fill)
-                .frame(width: size.width, height: size.height)
-                .clipped()
-                .accessibilityHidden(true)
-            Button {
-                Task { await openSpace() }
-            } label: {
-                Image("StartButton")
-                    .resizable()
-                    .aspectRatio(contentMode: .fit)
-                    .frame(width: size.width * Self.buttonWidth)
-                    .opacity(starting ? 0.6 : 1)
-                    .overlay { if starting { ProgressView() } }
+        SpatialStartBackground(size: Self.startSize)
+            .frame(width: Self.startSize.width, height: Self.startSize.height)
+            // The Start button sits just under the window, on its plane,
+            // rather than floating in front of the picture's depth.
+            .ornament(attachmentAnchor: .scene(.bottom), contentAlignment: .top) {
+                startButton
+                    .padding(.top, Self.buttonGap)
+                    // A little forward of the window, so the art's depth never covers it.
+                    .offset(z: Self.buttonForward)
             }
-            .buttonStyle(.plain)
-            .contentShape(.hoverEffect, Capsule())
-            .hoverEffect(.lift)
-            .disabled(starting)
-            .accessibilityLabel("Start")
-            .position(x: size.width * Self.buttonCentre.x, y: size.height * Self.buttonCentre.y)
+    }
+
+    private var startButton: some View {
+        Button {
+            Task { await openSpace() }
+        } label: {
+            Image("StartButton")
+                .resizable()
+                .aspectRatio(contentMode: .fit)
+                .frame(width: Self.startSize.width * Self.buttonWidth)
+                .opacity(starting ? 0.6 : 1)
+                .overlay { if starting { ProgressView() } }
         }
-        .frame(width: size.width, height: size.height)
+        .buttonStyle(.plain)
+        .contentShape(.hoverEffect, Capsule())
+        .hoverEffect(.lift)
+        .disabled(starting)
+        .accessibilityLabel("Start")
     }
 
     private var session: some View {

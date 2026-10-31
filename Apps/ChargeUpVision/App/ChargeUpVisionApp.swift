@@ -5,6 +5,11 @@ import ChargeUpCore
 struct ChargeUpVisionApp: App {
     @StateObject private var controller = SessionController()
 
+    init() {
+        // The start art's 3D scene takes a few seconds to generate; begin now.
+        Task { @MainActor in SpatialStartArt.shared.prepare() }
+    }
+
     var body: some Scene {
         WindowGroup(id: OperatorWindow.id) {
             OperatorWindow(controller: controller)
