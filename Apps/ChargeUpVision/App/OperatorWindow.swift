@@ -10,26 +10,67 @@ struct OperatorWindow: View {
     @Environment(\.openImmersiveSpace) private var openImmersiveSpace
     @Environment(\.dismissImmersiveSpace) private var dismissImmersiveSpace
     @State private var spaceOpen = false
+    /// True from the Start tap until the space opens: assets load for a few
+    /// seconds, and a second tap must not open the space twice.
+    @State private var starting = false
+
+    /// The start screen is the key art at 16:9, with the Start button in the
+    /// clear band between the logo and the podium (fractions of the art).
+    private static let startSize = CGSize(width: 960, height: 540)
+    private static let buttonCentre = CGPoint(x: 0.5, y: 0.725)
+    private static let buttonWidth: CGFloat = 0.28
 
     /// Debug only, default off: `CHARGEUP_AUTOSTART=1` in the environment
     /// presses Start on launch so the simulator can be driven without a click.
     private static let autostart = ProcessInfo.processInfo.environment["CHARGEUP_AUTOSTART"] == "1"
 
     var body: some View {
-        VStack(spacing: 20) {
-            Text("Charge Up")
-                .font(.largeTitle.bold())
-
+        Group {
             if !spaceOpen {
-                Button {
-                    Task { await openSpace() }
-                } label: {
-                    Text("Start")
-                        .font(.title.bold())
-                        .frame(maxWidth: .infinity, minHeight: 72)
-                }
-                .buttonStyle(.borderedProminent)
+                startScreen
             } else {
+                session
+            }
+        }
+        .task {
+            if OperatorWindow.autostart, !spaceOpen { await openSpace() }
+        }
+    }
+
+    private var startScreen: some View {
+        let size = Self.startSize
+        return ZStack {
+            Image("StartBackground")
+                .resizable()
+                .aspectRatio(contentMode: .fill)
+                .frame(width: size.width, height: size.height)
+                .clipped()
+                .accessibilityHidden(true)
+            Button {
+                Task { await openSpace() }
+            } label: {
+                Image("StartButton")
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: size.width * Self.buttonWidth)
+                    .opacity(starting ? 0.6 : 1)
+                    .overlay { if starting { ProgressView() } }
+            }
+            .buttonStyle(.plain)
+            .contentShape(.hoverEffect, Capsule())
+            .hoverEffect(.lift)
+            .disabled(starting)
+            .accessibilityLabel("Start")
+            .position(x: size.width * Self.buttonCentre.x, y: size.height * Self.buttonCentre.y)
+        }
+        .frame(width: size.width, height: size.height)
+    }
+
+    private var session: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                Text("Charge Up")
+                    .font(.largeTitle.bold())
                 status
                 if !controller.host.missingRoles.isEmpty {
                     HStack(spacing: 10) {
@@ -53,14 +94,15 @@ struct OperatorWindow: View {
                     }
                 }
             }
+            .padding(28)
         }
-        .padding(28)
-        .task {
-            if OperatorWindow.autostart, !spaceOpen { await openSpace() }
-        }
+        .frame(width: 560, height: 620)
     }
 
     private func openSpace() async {
+        guard !starting else { return }
+        starting = true
+        defer { starting = false }
         await controller.loadAssets()
         switch await openImmersiveSpace(id: ImmersiveView.id) {
         case .opened:

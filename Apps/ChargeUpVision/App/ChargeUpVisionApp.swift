@@ -9,7 +9,8 @@ struct ChargeUpVisionApp: App {
         WindowGroup(id: OperatorWindow.id) {
             OperatorWindow(controller: controller)
         }
-        .defaultSize(width: 520, height: 420)
+        // Sized by its content: the 16:9 start screen, then the status panel.
+        .windowResizability(.contentSize)
 
         ImmersiveSpace(id: ImmersiveView.id) {
             ImmersiveView(controller: controller)
