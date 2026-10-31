@@ -2,7 +2,7 @@
 # port_ring slot.
 #
 #   Blender -b --python prep_port.py -- <in.usdz> <out.usdz> <targetTris> <diameterM> \
-#       <glassRadius> <minSaturation> <coreRadius> [preview]
+#       <glassRadius> <minSaturation> <coreRadius> [thicknessM] [preview]
 #
 # The port's glass and its gold frame share one amber hue, so colour alone
 # cannot split them (prep_lantern.py's test). Here a face is "Glass" (the app
@@ -23,7 +23,11 @@ from mathutils import Vector
 argv = sys.argv[sys.argv.index("--")+1:]
 src, dst, target, diameter = argv[0], argv[1], int(argv[2]), float(argv[3])
 glass_radius, min_sat, core_radius = float(argv[4]), float(argv[5]), float(argv[6])
-preview = len(argv) > 7 and argv[7] == "preview"
+extra = argv[7:]
+preview = "preview" in extra
+# Optional: squash the disc to this thickness (a jewel, not a coin). Applied
+# after the Glass split, which reads the unsquashed normals.
+thickness = next((float(x) for x in extra if x != "preview"), None)
 
 bpy.ops.wm.read_factory_settings(use_empty=True)
 bpy.ops.wm.usd_import(filepath=src)
@@ -87,6 +91,10 @@ for _ in range(2):
 for p in me.polygons:
     p.material_index = 1 if is_glass[p.index] else 0
 print("GLASS faces", int(is_glass.sum()), "of", len(me.polygons))
+if thickness:
+    height = max(v.co.z for v in me.vertices)
+    for v in me.vertices: v.co.z *= thickness / height
+    me.update()
 
 tris = sum(len(p.vertices) - 2 for p in me.polygons)
 m = mesh.modifiers.new("dec", 'DECIMATE'); m.ratio = min(1.0, target / tris); m.use_collapse_triangulate = True
