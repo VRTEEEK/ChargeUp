@@ -5,7 +5,7 @@ For the person running the demo and for the judge who plays the nurse. Nothing h
 ## Kit
 
 - Apple Vision Pro (the child), charged, Charge Up installed, hand tracking allowed.
-- iPad (the nurse), Charge Up companion installed.
+- iPad (the nurse), Charge Up companion installed. A Mac can stand in: **Charge Up Nurse** in the Dock, the same nurse screen with keys (Space next, Return CONNECT on the countdown, R reset, K reset sky).
 - iPhone (the haptic phone), Charge Up companion installed, silent switch off, volume up.
 - Optional second iPhone or iPad as the Parent screen.
 - Personal Hotspot on the iPad. Name and password are on the inside of the kit lid, not in this file.
@@ -61,7 +61,7 @@ On the iPad, the **Rehearsal** toggle taps the button every 3 s and loops. Use i
 | Port disc is dim or frozen | The headset lost the forearm (a hand over the wrist). It holds the last place for 2 s then dims to half; it recovers on its own. Do not move the arm to "help". |
 | Port is on the wrong side of the arm | Operator: `config.forearm.dorsalAxis` in sequence.json, flip the sign. Rebuild. Not a demo-day fix. |
 | No haptics | Check the iPhone is in the Haptic role with a green dot and the volume is up. The pulse and ramp are driven by step changes; tap RESET then START to retrigger. |
-| Sky is empty, or crowded from testing | Operator window: Reset Sky, or `k` on the Mac nurse: clears back to six seeded lanterns. |
+| Sky is empty, or crowded from testing | Operator window: Reset Sky, or Reset Sky on the nurse screen (K on a Mac): clears back to six seeded lanterns. |
 | Headset shows nothing after Start | Operator window Stop, then Start again. If the Forearm line says `unauthorized`, open Settings on the headset and allow hand tracking for Charge Up. |
 | Everything is wrong | Operator window Stop; force-quit all three apps; follow the power and pairing order again. Under 2 minutes. |
 

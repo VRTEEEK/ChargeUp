@@ -21,7 +21,7 @@ struct HapticView: View {
                 VStack {
                     Spacer()
                     Text("No haptic hardware on this device")
-                        .font(.footnote)
+                        .font(.companion(.footnote))
                         .foregroundStyle(.white.opacity(0.6))
                         .padding(.bottom, 24)
                 }

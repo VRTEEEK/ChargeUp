@@ -38,10 +38,10 @@ struct ParentView: View {
     private var promptCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(mirror.currentStep?.name ?? (mirror.isComplete ? "Done" : "Getting ready"))
-                .font(.title3)
+                .font(.companion(.title3))
                 .foregroundStyle(.secondary)
             Text(session.sequence.prompt(for: mirror.currentStepId, in: language))
-                .font(.system(size: 40, weight: .semibold))
+                .font(.companion(size: 40, weight: .semibold))
                 .minimumScaleFactor(0.6)
                 .lineLimit(3)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -56,15 +56,15 @@ struct ParentView: View {
     private var lanterns: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack {
-                Text("Lanterns").font(.title2.bold())
+                Text("Lanterns").font(.companion(.title2).bold())
                 Spacer()
                 Text("\(mirror.sessions.count)")
-                    .font(.title2.monospacedDigit().bold())
+                    .font(.companion(.title2).monospacedDigit().bold())
                     .foregroundStyle(.secondary)
             }
             if mirror.sessions.isEmpty {
                 Text(session.isConnected ? "No lanterns yet." : "Lanterns appear once the headset is linked.")
-                    .font(.body)
+                    .font(.companion(.body))
                     .foregroundStyle(.secondary)
             } else {
                 ForEach(Array(mirror.sessions.reversed().enumerated()), id: \.element.id) { index, record in
@@ -72,10 +72,10 @@ struct ParentView: View {
                         Image(systemName: "lightbulb.fill")
                             .foregroundStyle(Color.yellow.opacity(0.4 + 0.6 * record.fill))
                         Text(record.date, style: .date)
-                            .font(.title3)
+                            .font(.companion(.title3))
                         Spacer()
                         Text(String(format: "%.0f%%", record.fill * 100))
-                            .font(.title3.monospacedDigit())
+                            .font(.companion(.title3).monospacedDigit())
                             .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)

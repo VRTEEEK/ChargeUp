@@ -1,6 +1,8 @@
 # ChargeUpMacNurse
 
-The Mac as the nurse, for days with a headset and no iPad. It is the same `SessionMirror` and `PeerChannel` the iPad companion uses, in a terminal.
+For automated and scripted runs only. To be the nurse on a Mac, use the **Charge Up Nurse** app (the companion app's macOS destination, in /Applications and the Dock), which has the same keys and a window you can also use with the mouse.
+
+It is the same `SessionMirror` and `PeerChannel` the companion uses, in a terminal.
 
 ## Launch
 

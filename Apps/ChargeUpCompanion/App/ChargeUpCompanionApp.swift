@@ -3,10 +3,51 @@ import ChargeUpCore
 
 @main
 struct ChargeUpCompanionApp: App {
+    #if os(macOS)
+    @NSApplicationDelegateAdaptor private var appDelegate: MacAppDelegate
+    #endif
+
     var body: some Scene {
+        #if os(macOS)
+        // One window, one channel: a second window would join the headset
+        // as a second nurse. Fixed size, sized by RootView.
+        Window(MacWindow.title(for: nil), id: "nurse") {
+            RootView()
+        }
+        .windowResizability(.contentSize)
+        #else
         WindowGroup {
             RootView()
         }
+        #endif
+    }
+}
+
+#if os(macOS)
+/// The Mac nurse is a single-window app: closing the window quits it.
+final class MacAppDelegate: NSObject, NSApplicationDelegate {
+    func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { true }
+}
+
+/// The Mac window: a fixed size readable from about a metre, titled by role.
+enum MacWindow {
+    static let size = CGSize(width: 1180, height: 800)
+
+    static func title(for role: Role?) -> String {
+        role == .parent ? "Charge Up — Parent" : "Charge Up — Nurse"
+    }
+}
+#endif
+
+/// The roles this device can take. A Mac has no haptic engine to ramp, so
+/// it offers only Nurse and Parent.
+enum CompanionRoles {
+    static var offered: [Role] {
+        #if os(macOS)
+        [.nurse, .parent]
+        #else
+        [.nurse, .parent, .haptic]
+        #endif
     }
 }
 
@@ -45,6 +86,10 @@ struct RootView: View {
         }
         .environment(\.layoutDirection, language.isRightToLeft ? .rightToLeft : .leftToRight)
         .environment(\.locale, Locale(identifier: language.localeIdentifier))
+        #if os(macOS)
+        .frame(width: MacWindow.size.width, height: MacWindow.size.height)
+        .navigationTitle(MacWindow.title(for: session?.role))
+        #endif
     }
 }
 
@@ -55,9 +100,9 @@ struct RolePicker: View {
     var body: some View {
         VStack(spacing: 24) {
             Text("Charge Up")
-                .font(.largeTitle.bold())
+                .font(.companion(.largeTitle).bold())
             Text("Who is this device?")
-                .font(.title2)
+                .font(.companion(.title2))
                 .foregroundStyle(.secondary)
             Picker("Language", selection: $languageRaw) {
                 Text("English").tag(PromptLanguage.en.rawValue)
@@ -65,12 +110,12 @@ struct RolePicker: View {
             }
             .pickerStyle(.segmented)
             .frame(maxWidth: 320)
-            ForEach([Role.nurse, .parent, .haptic], id: \.self) { role in
+            ForEach(CompanionRoles.offered, id: \.self) { role in
                 Button {
                     pick(role)
                 } label: {
                     Text(role.rawValue.capitalized)
-                        .font(.title.bold())
+                        .font(.companion(.title).bold())
                         .frame(maxWidth: 420, minHeight: 88)
                 }
                 .buttonStyle(.borderedProminent)
@@ -94,12 +139,11 @@ struct RoleView: View {
             case .vision: Text("This app never runs as vision.")
             }
         }
-        .onAppear { UIApplication.shared.isIdleTimerDisabled = true }
-        .onDisappear { UIApplication.shared.isIdleTimerDisabled = false }
+        .modifier(KeepAwake())
         .safeAreaInset(edge: .top) {
             HStack {
                 Button("Change role", action: leave)
-                    .font(.footnote)
+                    .font(.companion(.footnote))
                 Spacer()
                 ConnectionBadge(session: session)
             }
@@ -125,7 +169,36 @@ struct ConnectionBadge: View {
                 Text("Looking for headset")
             }
         }
-        .font(.footnote)
+        .font(.companion(.footnote))
         .foregroundStyle(.secondary)
+    }
+}
+
+/// While a role is open the screen stays on. On a Mac this also keeps App
+/// Nap from throttling the link to the headset when the window is covered.
+struct KeepAwake: ViewModifier {
+    #if os(macOS)
+    @State private var activity: NSObjectProtocol?
+    #endif
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear {
+                #if os(macOS)
+                activity = ProcessInfo.processInfo.beginActivity(
+                    options: [.idleDisplaySleepDisabled, .userInitiated],
+                    reason: "Charge Up session in progress")
+                #else
+                UIApplication.shared.isIdleTimerDisabled = true
+                #endif
+            }
+            .onDisappear {
+                #if os(macOS)
+                if let activity { ProcessInfo.processInfo.endActivity(activity) }
+                activity = nil
+                #else
+                UIApplication.shared.isIdleTimerDisabled = false
+                #endif
+            }
     }
 }

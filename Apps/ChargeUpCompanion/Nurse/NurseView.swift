@@ -3,10 +3,22 @@ import ChargeUpCore
 
 /// The nurse's whole interface: the step list, one big button, two presence
 /// indicators, and a log export for the acceptance run.
+///
+/// Keys (a Mac, or an iPad with a keyboard), each also a button for the
+/// mouse: Space is the big button on every step but the countdown, where
+/// only Return sends CONNECT, so the needle moment never fires on the
+/// key that advances everything else. R resets the session, K the sky.
 struct NurseView: View {
     @ObservedObject var session: CompanionSession
 
     private var mirror: SessionMirror { session.mirror }
+    private var isCountdown: Bool { mirror.currentStepId == StepID.countdown }
+
+    #if os(macOS)
+    private static let controlsWidth: CGFloat = 440
+    #else
+    private static let controlsWidth: CGFloat = 360
+    #endif
 
     var body: some View {
         GeometryReader { geo in
@@ -14,7 +26,7 @@ struct NurseView: View {
             if wide {
                 HStack(spacing: 24) {
                     stepList.frame(maxWidth: .infinity)
-                    controls.frame(width: 360)
+                    controls.frame(width: Self.controlsWidth)
                 }
                 .padding()
             } else {
@@ -39,25 +51,26 @@ struct NurseView: View {
                 mirror.tapButton()
             } label: {
                 Text(mirror.buttonLabel)
-                    .font(.system(size: 40, weight: .heavy))
+                    .font(.companion(size: 40, weight: .heavy))
                     .frame(maxWidth: .infinity, minHeight: 140)
             }
             .buttonStyle(.borderedProminent)
-            .tint(mirror.currentStepId == StepID.countdown ? .orange : .accentColor)
+            .tint(isCountdown ? .orange : .accentColor)
             .disabled(!mirror.isButtonEnabled)
+            .keyboardShortcut(isCountdown ? .return : .space, modifiers: [])
 
             if let ms = mirror.lastConnectRoundTripMs {
                 Text(String(format: "Connect round trip %.0f ms", ms))
-                    .font(.footnote.monospacedDigit())
+                    .font(.companion(.footnote).monospacedDigit())
                     .foregroundStyle(.secondary)
             }
 
             Toggle(isOn: Binding(get: { session.rehearsal.isOn }, set: { session.rehearsal.set($0) })) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text("Rehearsal").font(.headline)
+                    Text("Rehearsal").font(.companion(.headline))
                     Text(String(format: "Taps every %.0f s so one person can test the headset alone.",
                                 session.sequence.config.rehearsalInterval))
-                        .font(.footnote)
+                        .font(.companion(.footnote))
                         .foregroundStyle(.secondary)
                 }
             }
@@ -70,10 +83,21 @@ struct NurseView: View {
                     Label("Export log", systemImage: "square.and.arrow.up")
                 }
                 Spacer()
+                Button("Reset Sky", role: .destructive) { mirror.sendResetSky() }
+                    .disabled(!session.isConnected)
+                    .keyboardShortcut("k", modifiers: [])
                 Button("Reset", role: .destructive) { mirror.sendReset() }
                     .disabled(!session.isConnected)
+                    .keyboardShortcut("r", modifiers: [])
             }
-            .font(.footnote)
+            .font(.companion(.footnote))
+
+            #if os(macOS)
+            Text(isCountdown ? "Return  CONNECT    R  reset    K  reset sky"
+                             : "Space  \(mirror.buttonLabel)    R  reset    K  reset sky")
+                .font(.companion(.footnote).monospaced())
+                .foregroundStyle(.secondary)
+            #endif
         }
     }
 }
@@ -90,14 +114,14 @@ struct StepListView: View {
                 let current = step.id == currentStepId
                 HStack(alignment: .firstTextBaseline, spacing: 12) {
                     Text("\(sequence.index(of: step.id).map { $0 + 1 } ?? 0)")
-                        .font(.title3.monospacedDigit().bold())
+                        .font(.companion(.title3).monospacedDigit().bold())
                         .frame(width: 28)
                     VStack(alignment: .leading, spacing: 2) {
                         Text(step.name)
-                            .font(current ? .title2.bold() : .title3)
+                            .font(current ? .companion(.title2).bold() : .companion(.title3))
                         if showCues {
                             Text(step.clinicalCue)
-                                .font(.subheadline)
+                                .font(.companion(.subheadline))
                                 .foregroundStyle(.secondary)
                         }
                     }
@@ -141,7 +165,7 @@ struct PresenceIndicators: View {
                 Circle()
                     .fill(on ? Color.green : Color.gray.opacity(0.4))
                     .frame(width: 22, height: 22)
-                Text(label).font(.headline)
+                Text(label).font(.companion(.headline))
             }
             .frame(maxWidth: .infinity)
         }
