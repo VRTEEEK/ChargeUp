@@ -105,6 +105,101 @@ import Testing
         #expect(seq.config.companion.fidgetMaxPerSession == 1)
     }
 
+    /// Replaces the first character's `key`, or removes it when `value` is nil.
+    private func withMonkey(_ key: String, _ value: Any?) throws -> [String: Any] {
+        var json = try shippedJSON()
+        var config = json["config"] as! [String: Any]
+        var companion = config["companion"] as! [String: Any]
+        var characters = companion["characters"] as! [[String: Any]]
+        characters[0][key] = value
+        companion["characters"] = characters
+        config["companion"] = companion
+        json["config"] = config
+        return json
+    }
+
+    private func withCompanion(_ key: String, _ value: Any?) throws -> [String: Any] {
+        var json = try shippedJSON()
+        var config = json["config"] as! [String: Any]
+        var companion = config["companion"] as! [String: Any]
+        companion[key] = value
+        config["companion"] = companion
+        json["config"] = config
+        return json
+    }
+
+    @Test func theMonkeyIsTheFirstCharacterWithItsFilesAndAClipForEveryCueItUses() throws {
+        let c = try ChargeSequence.shipped().config.companion
+        let monkey = try #require(c.characters.first)
+        #expect(monkey.name == "monkey")
+        #expect(monkey.model == "companion_model")
+        let expected: [CompanionClip: String] = [
+            .idleAlt: "companion_clip_idle_alt", .wave: "companion_clip_wave", .listen: "companion_clip_listen",
+            .look: "companion_clip_look", .sway: "companion_clip_sway", .fidget: "companion_clip_fidget",
+            .heart: "companion_clip_heart", .cheer: "companion_clip_cheer",
+        ]
+        #expect(monkey.clipFiles == expected)
+        #expect(c.characterFiles.contains("companion_model"))
+    }
+
+    @Test func theDogIsTheSecondCharacterSilentWithItsOwnClips() throws {
+        let c = try ChargeSequence.shipped().config.companion
+        let dog = try #require(c.characters.dropFirst().first)
+        #expect(dog.name == "dog")
+        #expect(dog.model == "dog_model")
+        #expect(dog.clipFiles == [.wave: "dog_clip_wave", .listen: "dog_clip_listen",
+                                  .sway: "dog_clip_sway", .look: "dog_clip_look"])
+        #expect(dog.voices == nil, "silent, never the monkey's voice")
+    }
+
+    @Test func everyCharacterFileIsInTheAssetsPackage() throws {
+        let assets = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("Apps/ChargeUpVision/Assets/ChargeUpAssets/Sources/ChargeUpAssets/ChargeUpAssets.rkassets")
+        for file in try ChargeSequence.shipped().config.companion.characterFiles {
+            #expect(FileManager.default.fileExists(atPath: assets.appendingPathComponent("\(file).usdz").path), "\(file).usdz")
+        }
+    }
+
+    @Test func aBadCharacterFailsLoudly() throws {
+        for (key, value) in [("name", ""), ("model", "")] as [(String, Any)] {
+            #expect(throws: DecodingError.self) { try load(try withMonkey(key, value)) }
+        }
+        for missing in ["name", "model", "clips"] {
+            #expect(throws: DecodingError.self) { try load(try withMonkey(missing, nil)) }
+        }
+        #expect(throws: DecodingError.self, "a misspelt clip would quietly play as idle") {
+            try load(try withMonkey("clips", ["wavve": "companion_clip_wave"]))
+        }
+        #expect(throws: DecodingError.self, "idle is the model's own clip") {
+            try load(try withMonkey("clips", ["idle": "companion_clip_wave"]))
+        }
+        #expect(throws: DecodingError.self) { try load(try withCompanion("characters", [Any]())) }
+        #expect(throws: DecodingError.self) { try load(try withCompanion("characters", nil)) }
+        #expect(throws: DecodingError.self) { try load(try withCompanion("switchFadeS", 0)) }
+    }
+
+    @Test func aSecondCharacterNeedsOnlyANameAModelAndItsClips() throws {
+        var json = try shippedJSON()
+        var config = json["config"] as! [String: Any]
+        var companion = config["companion"] as! [String: Any]
+        var characters = companion["characters"] as! [[String: Any]]
+        characters.append(["name": "fox", "model": "fox_model", "clips": ["wave": "fox_wave"]])
+        companion["characters"] = characters
+        config["companion"] = companion
+        json["config"] = config
+        let c = try load(json).config.companion
+        #expect(c.characters.map(\.name) == ["monkey", "dog", "fox"])
+        #expect(c.characters.last?.voices == nil, "silent, never the monkey's voice")
+        #expect(c.characterFiles.contains("fox_model") && c.characterFiles.contains("fox_wave"))
+        characters.append(["name": "fox", "model": "other", "clips": [:] as [String: String]])
+        companion["characters"] = characters
+        config["companion"] = companion
+        json["config"] = config
+        #expect(throws: DecodingError.self, "two of the same name") { try load(json) }
+    }
+
     @Test func unknownCompanionCueFails() throws {
         var json = try shippedJSON()
         var steps = json["steps"] as! [[String: Any]]
@@ -212,11 +307,12 @@ import Testing
 
     @Test func theMonkeySpeaksOnlyOnItsFriendlyMomentsAndEveryVoiceHasAFile() throws {
         let c = try ChargeSequence.shipped().config.companion
-        #expect(Set(c.voices.keys) == ["wave", "cheer", "heart"])
+        let voices = try #require(c.characters.first?.voices)
+        #expect(Set(voices.keys) == ["wave", "cheer", "heart"])
         for quiet in c.chargeVariety + ["look", "listen", "fidget"] {
-            #expect(c.voices[quiet] == nil, "\(quiet) plays while the child may rest: silent")
+            #expect(voices[quiet] == nil, "\(quiet) plays while the child may rest: silent")
         }
-        #expect((c.voices["wave"]?.count ?? 0) >= 2, "greetings take turns")
+        #expect((voices["wave"]?.count ?? 0) >= 2, "greetings take turns")
         let sounds = URL(fileURLWithPath: #filePath)
             .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
             .deletingLastPathComponent().deletingLastPathComponent()

@@ -24,7 +24,7 @@ final class SceneDirector {
     /// Nil unless config.tree.enabled and the lantern_tree slot has a file;
     /// then the sky's lanterns hang on it instead of floating in a cluster.
     let tree: LanternTree?
-    /// Nil unless config.companion.enabled and the model slot has a file.
+    /// Nil unless config.companion.enabled and a character's model file is there.
     let companion: CompanionEntity?
     private var lastStepId: String?
     /// Flight to the sky: when it started. The target is re-read every frame.
@@ -47,6 +47,8 @@ final class SceneDirector {
     private var lastPlayAt: TimeInterval = -.infinity
     private var lastPlayClip: String?
     private var playRandom = SystemRandomNumberGenerator()
+    /// Pinching the monkey: the clips in turn (config.companion.touch.pinchClips).
+    private var pinchResponder = CompanionResponder()
     /// The last chime a pinched lantern played, so the next is different.
     private var lastChime: String?
     /// Sparkles on what the child's head points at (LookSparkle): one
@@ -111,13 +113,15 @@ final class SceneDirector {
             }
             bank.companionSource.position = c.headTop
             c.root.addChild(bank.companionSource)
-            let voices = config.companion.voices
-            c.onClipStarted = { [weak bank] clip in bank?.playVoice(forClip: clip, voices: voices) }
+            c.onClipStarted = { [weak bank, weak c] clip in
+                guard let c else { return }
+                bank?.playVoice(forClip: clip, voices: c.voices)
+            }
             companion = c
             controller.noteCompanion(c.status)
         } else {
             companion = nil
-            controller.noteCompanion(config.companion.enabled ? "enabled but companion_model missing" : "off")
+            controller.noteCompanion(config.companion.enabled ? "enabled but no character's model is there" : "off")
         }
         sky.show(controller.skySessions, now: CACurrentMediaTime())
         controller.onSkyChanged = { [weak self] sessions in self?.skyChanged(sessions) }
@@ -381,14 +385,14 @@ final class SceneDirector {
     }
 
     /// Look and pinch: on a hung lantern it swings away from the child; on
-    /// the monkey it plays a random clip, never the same twice running, at
-    /// most once per config.companion.touch.cooldownMs.
+    /// the monkey it plays the next of config.companion.touch.pinchClips, at
+    /// most once per its cooldownMs.
     func pinch(_ entity: Entity) {
         let now = CACurrentMediaTime()
         if let companion, companion.contains(entity) {
             let touch = controller.sequence.config.companion.touch
             guard companion.isPresent, touch.pinch, touch.isActive(stepId: controller.currentStepId) else { return }
-            playRandomClip(companion, now: now)
+            playNextClip(companion, now: now)
             return
         }
         let head = controller.headPose.current().map { ForearmPoseSolver.translation(of: $0) }
@@ -398,6 +402,19 @@ final class SceneDirector {
             lastChime = chime
             sounds.playChime(chime, at: centre)
         }
+    }
+
+    /// Look, pinch and drag on the companion, let go: a drag across the
+    /// child's head past config.companion.touch.switchDragMm changes the
+    /// character. `start` and `end` are the hand's world positions. Only the
+    /// companion answers; nothing here reaches the session.
+    func drag(_ entity: Entity, from start: SIMD3<Float>, to end: SIMD3<Float>) {
+        guard let companion, companion.contains(entity) else { return }
+        let touch = controller.sequence.config.companion.touch
+        guard companion.isPresent, touch.pinch, touch.isActive(stepId: controller.currentStepId) else { return }
+        let step = CompanionSwitch.step(from: start, to: end, head: controller.headPose.current() ?? matrix_identity_float4x4,
+                                        threshold: touch.switchDrag)
+        if step != 0 { companion.switchCharacter(by: step, at: CACurrentMediaTime()) }
     }
 
     /// Touching the monkey: a fingertip or knuckle reaching its body (a
@@ -419,13 +436,26 @@ final class SceneDirector {
         playRandomClip(companion, now: now)
     }
 
-    /// Touch and pinch: a random clip, never the same twice running, at
-    /// most once per config.companion.touch.cooldownMs across both.
+    /// Touch: a random clip, never the same twice running, at most once per
+    /// config.companion.touch.cooldownMs across touch and pinch.
     private func playRandomClip(_ companion: CompanionEntity, now: TimeInterval) {
         let touch = controller.sequence.config.companion.touch
         guard now - lastPlayAt >= touch.cooldown,
               let clip = touch.randomResponse(after: lastPlayClip, using: &playRandom),
               companion.answer(clip, at: now) else { return }
+        lastPlayAt = now
+        lastPlayClip = clip
+    }
+
+    /// Pinch: the next clip in turn, under the same cooldown as touch. The
+    /// turn is spent only if the companion answered.
+    private func playNextClip(_ companion: CompanionEntity, now: TimeInterval) {
+        let touch = controller.sequence.config.companion.touch
+        var responder = pinchResponder
+        guard now - lastPlayAt >= touch.cooldown,
+              let clip = responder.respond(at: now, cooldown: 0, responses: touch.pinchClips),
+              companion.answer(clip, at: now) else { return }
+        pinchResponder = responder
         lastPlayAt = now
         lastPlayClip = clip
     }

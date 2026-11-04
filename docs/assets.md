@@ -36,7 +36,11 @@ The energy stream from the port to the lantern (31 Oct) replaced the cable, its 
 
 ## Companion (off by default)
 
-`config.companion.enabled` (true since 31 Oct, for the headset run) gates a character beside the lantern. Slots, all USDZ in the `.rkassets` folder; only the ones the sequence references are loaded:
+`config.companion.enabled` (true since 31 Oct, for the headset run) gates a character beside the lantern. `config.companion.characters` lists who it can be; the first is who it is at the start of every session, and every file named there is loaded when the session starts. Each entry has a `name`, a `model` file, a `clips` map of clip name to file, and optional `voices` by clip name. All are USDZ in the `.rkassets` folder, named without the extension.
+
+To add a character: put its files in the `.rkassets` folder and add an entry. The model's own clip is its idle loop, so `clips` never names `idle`. Clip names are `idleAlt`, `wave`, `listen`, `look`, `sway`, `fidget`, `heart`, `cheer`; a misspelt name fails decoding. A clip the character lacks plays as idle. A character with no `voices` is silent, never the monkey's voice. Height is `heightM` for all of them. A character whose model file is absent is left out of the cycle, and the operator window shows how many of the list loaded.
+
+The monkey, the first character and the one every session starts on:
 
 | File name | Clip inside | Length | Used by |
 |---|---|---|---|
@@ -51,6 +55,18 @@ The energy stream from the port to the lantern (31 Oct) replaced the cable, its 
 | `companion_clip_cheer.usdz` | Cheer_with_Both_Hands | 3 s | release (`heartCheer`), second, at 0.8 |
 
 Agree and Spin are no longer referenced and are not in the package. The clip files carry placeholder textures and are only read for their animation resource.
+
+The dog (4 Nov), Meshy's fennec fox pup with goggles and a lantern charm, silent, reached by the switch drag. Its Meshy exports are Z-up with no root rotation, unlike the monkey's Y-up files; RealityKit applies the stage's `upAxis` itself (checked by loading the file on macOS: the 1.9 m height lands in Y), so they are packed unchanged. The clip files are the same exports with the three texture JPEGs swapped for a 4 × 4 placeholder (`usdzip` repack, 37.5 → 10.5 MB each; the mesh stays, which the entity-swap fallback would need):
+
+| File name | Clip inside | Length | Used by |
+|---|---|---|---|
+| `dog_model.usdz` | idle_breathing | 3 s | the rendered model; its own clip is the idle loop |
+| `dog_clip_wave.usdz` | wave | 3 s | cream (`waveIn`); pinch |
+| `dog_clip_listen.usdz` | listening_gesture | 6 s | countdown and connect (`listen`) |
+| `dog_clip_sway.usdz` | happy_sway | 2 s | charge variety, at 0.6 |
+| `dog_clip_look.usdz` | breathe_look_around | 4 s | flush (`lookOnce`); charge variety; pinch |
+
+The cues it lacks fall back as designed: `heart` and `cheer` at release play as idle, `idleAlt` in the charge variety plays as idle, and the pinch turn that would play `heart` plays idle.
 
 Rules: idle is a real loop of the model's own clip and is the one clip that loops. Every other clip plays once at `config.companion.speed` (0.7) or its entry in `speedOverrides`; every change, including into idle, cross-fades over `crossfadeS` (0.3) using the playback transition. Cues per step row (`companion` field): `waveIn` fades in over `fadeS`, waves once, idles; `idle`; `listen` runs the listen clip and keeps it running across following steps that also say listen; `lookOnce` looks around once, then idles; `charging` idles and every `chargeVarietyEverySMin` to `Max` (25 to 40) seconds plays one of `chargeVariety` (look, sway, idleAlt) chosen at random without repeating the last, then idles; `heartCheer` plays heart once as the lantern lights, then cheer once as it rises. Placement is unchanged: `heightM` tall, feet on the lantern's base plane, beside it on the side opposite `config.forearm.heldArm`, world-anchored with the lantern. No reaction to presence or charge pauses, no sound, nothing on the companions.
 

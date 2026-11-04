@@ -84,10 +84,14 @@ public struct WaveDetector: Equatable, Sendable {
     /// world positions and the head's transform.
     public static func measure(hand: SIMD3<Float>, head: simd_float4x4, config: CompanionWaveConfig) -> (lateral: Float, raised: Bool) {
         let headPos = SIMD3<Float>(head.columns.3.x, head.columns.3.y, head.columns.3.z)
-        var right = SIMD3<Float>(head.columns.0.x, 0, head.columns.0.z)
-        right = simd_length(right) > 1e-4 ? simd_normalize(right) : SIMD3(1, 0, 0)
         let raised = hand.y >= headPos.y - Float(config.raisedBelowHeadM)
-        return (simd_dot(hand - headPos, right), raised)
+        return (simd_dot(hand - headPos, right(of: head)), raised)
+    }
+
+    /// The head's right, level with the floor.
+    static func right(of head: simd_float4x4) -> SIMD3<Float> {
+        let right = SIMD3<Float>(head.columns.0.x, 0, head.columns.0.z)
+        return simd_length(right) > 1e-4 ? simd_normalize(right) : SIMD3(1, 0, 0)
     }
 }
 
@@ -114,14 +118,16 @@ public struct CompanionResponder: Equatable, Sendable {
 
 }
 
-/// Touching or pinching the companion plays a random cute clip from
-/// `responses`, never the same twice running, at most once per `cooldownMs`
-/// across both. Touch: a fingertip or knuckle of either hand reaching its
-/// body (a standing capsule `bodyRadius` of its height wide, from its feet
-/// to the top of its head) within `marginMm`; the hand must move `rearmMm`
-/// further away before the next touch counts. Pinch (`pinch`): look and
-/// pinch, the system's own targeting, on the same capsule. Quiet on
-/// `quietSteps` (the countdown and the needle).
+/// Touching the companion plays a random cute clip from `responses`, never
+/// the same twice running; pinching it plays the next of `pinchClips`; at
+/// most one or the other per `cooldownMs`. Touch: a fingertip or knuckle of
+/// either hand reaching its body (a standing capsule `bodyRadius` of its
+/// height wide, from its feet to the top of its head) within `marginMm`; the
+/// hand must move `rearmMm` further away before the next touch counts. Pinch
+/// (`pinch`): look and pinch, the system's own targeting, on the same
+/// capsule. Pinching it, dragging at least `switchDragMm` left or right and
+/// letting go changes the character (CompanionSwitch). Quiet on `quietSteps`
+/// (the countdown and the needle).
 public struct CompanionTouchConfig: Codable, Equatable, Sendable {
     public var enabled: Bool
     public var quietSteps: [String]
@@ -131,11 +137,15 @@ public struct CompanionTouchConfig: Codable, Equatable, Sendable {
     public var cooldownMs: Int
     public var pinch: Bool
     public var responses: [String]
+    public var pinchClips: [String]
+    public var switchDragMm: Double
 
     public var cooldown: TimeInterval { Double(cooldownMs) / 1000 }
+    public var switchDrag: Float { Float(switchDragMm / 1000) }
 
     func validate() -> Bool {
         bodyRadius > 0 && marginMm >= 0 && rearmMm >= 0 && cooldownMs >= 0 && responses.count >= 2
+            && !pinchClips.isEmpty && pinchClips.allSatisfy { CompanionClip(rawValue: $0) != nil } && switchDragMm > 0
     }
 
     /// A random clip from `responses`, never `last` again.

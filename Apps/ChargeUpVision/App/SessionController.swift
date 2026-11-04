@@ -192,7 +192,8 @@ final class SessionController: ObservableObject {
 
     /// Called by the operator window before opening the space.
     func loadAssets() async {
-        await assets.load(accessSite: sequence.config.accessSite, companionEnabled: sequence.config.companion.enabled,
+        let companion = sequence.config.companion
+        await assets.load(accessSite: sequence.config.accessSite, characterFiles: companion.enabled ? companion.characterFiles : [],
                           treeEnabled: sequence.config.tree.enabled)
         assetStatus = assets.status
     }

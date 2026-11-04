@@ -68,9 +68,19 @@
   "config": {
     "companion": {
       "enabled": true,
+      "characters": [
+        { "name": "monkey", "model": "companion_model",
+          "clips": { "idleAlt": "companion_clip_idle_alt", "wave": "companion_clip_wave", "listen": "companion_clip_listen",
+                     "look": "companion_clip_look", "sway": "companion_clip_sway", "fidget": "companion_clip_fidget",
+                     "heart": "companion_clip_heart", "cheer": "companion_clip_cheer" },
+          "voices": { "wave": ["monkey_wave_1", "monkey_wave_2"], "cheer": ["monkey_cheer"], "heart": ["monkey_heart"] } },
+        { "name": "dog", "model": "dog_model",
+          "clips": { "wave": "dog_clip_wave", "listen": "dog_clip_listen", "sway": "dog_clip_sway", "look": "dog_clip_look" } }
+      ],
       "heightM": 0.22,
       "gapM": 0.06,
       "fadeS": 1.2,
+      "switchFadeS": 0.25,
       "speed": 0.7,
       "crossfadeS": 0.3,
       "speedOverrides": { "wave": 0.8, "sway": 0.6, "cheer": 0.8 },
@@ -82,8 +92,8 @@
                 "reversals": 2, "windowMs": 1500, "cooldownMs": 3000, "responses": ["wave"] },
       "touch": { "enabled": true, "quietSteps": ["countdown", "connect"], "bodyRadius": 0.3, "marginMm": 40,
                  "rearmMm": 60, "cooldownMs": 2500, "pinch": true,
-                 "responses": ["heart", "cheer", "wave", "sway", "fidget", "look", "idleAlt"] },
-      "voices": { "wave": ["monkey_wave_1", "monkey_wave_2"], "cheer": ["monkey_cheer"], "heart": ["monkey_heart"] },
+                 "responses": ["heart", "cheer", "wave", "sway", "fidget", "look", "idleAlt"],
+                 "pinchClips": ["wave", "heart", "look"], "switchDragMm": 80 },
       "voiceGainDb": -4
     },
     "accessSite": "arm",

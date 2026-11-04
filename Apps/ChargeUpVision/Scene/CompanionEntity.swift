@@ -2,35 +2,66 @@ import Foundation
 import RealityKit
 import ChargeUpCore
 
-/// The companion character beside the lantern. One skinned model from
-/// companion_model (its own clip is the breathing idle); the other clips
-/// come from the companion_clip_* files and are played on that model by
-/// retargeting, verified by a joint-transform probe with an entity-swap
-/// fallback. Idle is a real loop and is the one clip that loops; every
-/// other clip plays once at config.companion.speed (or its override) and
-/// every change, including back into idle, cross-fades over crossfadeS.
+/// The companion character beside the lantern, one of
+/// config.companion.characters at a time, starting each session on the first.
+/// One skinned model per character (its own clip is the breathing idle); the
+/// other clips come from the character's clip files and are played on that
+/// model by retargeting, verified by a joint-transform probe with an
+/// entity-swap fallback. Idle is a real loop and is the one clip that loops;
+/// every other clip plays once at config.companion.speed (or its override),
+/// a clip the character lacks plays as idle, and every change, including back
+/// into idle, cross-fades over crossfadeS.
 /// Everything it does is a CompanionCue on a sequence row, with two
 /// exceptions: it waves back when the child waves (config.companion.wave)
-/// and plays when touched (config.companion.touch), except on the countdown
-/// and the needle.
+/// and plays or changes character when touched (config.companion.touch),
+/// except on the countdown and the needle.
 @MainActor
 final class CompanionEntity {
-    enum Clip: String, CaseIterable {
-        case idle, idleAlt, wave, listen, look, sway, fidget, heart, cheer
+    typealias Clip = CompanionClip
 
-        var slot: AssetSlot? {
-            switch self {
-            case .idle: return nil   // the model's own clip
-            case .idleAlt: return .companionClipIdleAlt
-            case .wave: return .companionClipWave
-            case .listen: return .companionClipListen
-            case .look: return .companionClipLook
-            case .sway: return .companionClipSway
-            case .fidget: return .companionClipFidget
-            case .heart: return .companionClipHeart
-            case .cheer: return .companionClipCheer
+    /// One character, loaded and fitted; only the current one is enabled.
+    @MainActor
+    private final class Body {
+        let character: CompanionCharacter
+        let model: Entity
+        var clipEntities: [Clip: Entity] = [:]
+        var clipResources: [Clip: AnimationResource] = [:]
+        var shown: Entity
+        var mode: ClipMode = .retargeting
+        var status = ""
+
+        /// Nil when the character's model file is absent.
+        init?(_ character: CompanionCharacter, assets: AssetCatalog, height: Float) {
+            guard let model = assets.characterModel(character.model) else { return nil }
+            self.character = character
+            self.model = model
+            self.shown = model
+            CompanionEntity.fit(model, height: height)
+            if let own = model.availableAnimations.first { clipResources[.idle] = own.repeat() }
+            for (clip, file) in character.clipFiles {
+                guard let entity = assets.characterModel(file) else { continue }
+                if let res = entity.availableAnimations.first { clipResources[clip] = res }
+                CompanionEntity.fit(entity, height: height)
+                entity.isEnabled = false
+                clipEntities[clip] = entity
             }
+            status = "loaded, \(clipResources.count) clips, retargeting"
         }
+
+        /// Off, with the model on top for when it comes back.
+        func hide() {
+            shown.stopAllAnimations()
+            shown.isEnabled = false
+            model.isEnabled = false
+            shown = model
+        }
+    }
+
+    /// A change of character under way: fading out toward `to`, or, once
+    /// that is nil, the new one fading in.
+    private struct Switching {
+        var to: Int?
+        var started: TimeInterval
     }
 
     private enum Phase: Equatable {
@@ -43,11 +74,12 @@ final class CompanionEntity {
 
     let root = Entity()
     private let config: CompanionConfig
-    private var clipEntities: [Clip: Entity] = [:]
-    private var clipResources: [Clip: AnimationResource] = [:]
-    private let model: Entity
-    private var shown: Entity
-    private var mode: ClipMode = .retargeting
+    private let cast: [Body]
+    private var current = 0
+    private var body: Body { cast[current] }
+    private var switching: Switching?
+    /// The release row's heart and cheer are running; nothing cuts in.
+    private var celebrating = false
     private var controller: AnimationPlaybackController?
     private var phase: Phase = .idle
     private var probe: (clip: Clip, started: TimeInterval, before: [Transform])?
@@ -59,26 +91,21 @@ final class CompanionEntity {
     private var nextVarietyAt: TimeInterval = 0
     private var lastVariety: Clip?
     private var fidgetsThisSession = 0
-    private(set) var status = "off"
+    var status: String { "\(body.character.name), \(cast.count) of \(config.characters.count) characters, \(body.status)" }
+    /// The current character's voices, by clip name.
+    var voices: [String: [String]] { body.character.voices ?? [:] }
 
-    /// Nil when the model slot is empty.
+    /// Nil when no character's model file is there.
     init?(assets: AssetCatalog, config: CompanionConfig) {
-        guard let model = assets.model(.companionModel) else { return nil }
+        let cast = config.characters.compactMap { Body($0, assets: assets, height: config.height) }
+        guard !cast.isEmpty else { return nil }
         self.config = config
-        self.model = model
-        self.shown = model
+        self.cast = cast
         root.name = "companion"
-        Self.fit(model, height: config.height)
-        root.addChild(model)
-
-        if let own = model.availableAnimations.first { clipResources[.idle] = own.repeat() }
-        for clip in Clip.allCases {
-            guard let slot = clip.slot, let entity = assets.model(slot) else { continue }
-            if let res = entity.availableAnimations.first { clipResources[clip] = res }
-            Self.fit(entity, height: config.height)
-            entity.isEnabled = false
-            root.addChild(entity)
-            clipEntities[clip] = entity
+        for (index, body) in cast.enumerated() {
+            root.addChild(body.model)
+            for entity in body.clipEntities.values { root.addChild(entity) }
+            body.model.isEnabled = index == 0
         }
         root.components.set(OpacityComponent(opacity: 0))
         // Look and pinch target: a capsule standing over its body, in the
@@ -95,12 +122,13 @@ final class CompanionEntity {
             root.components.set(input)
         }
         root.isEnabled = false
-        status = "loaded, \(clipResources.count) clips, retargeting"
-        AssetCatalog.logger.info("companion: clips \(self.clipResources.keys.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+        for body in cast {
+            AssetCatalog.logger.info("companion \(body.character.name, privacy: .public): clips \(body.clipResources.keys.map(\.rawValue).sorted().joined(separator: ","), privacy: .public)")
+        }
     }
 
     /// Scale so the model stands `height` tall with its feet at the entity's y = 0.
-    private static func fit(_ entity: Entity, height: Float) {
+    fileprivate static func fit(_ entity: Entity, height: Float) {
         let b = entity.visualBounds(relativeTo: nil)
         let h = max(0.001, b.max.y - b.min.y)
         let s = height / h
@@ -111,7 +139,7 @@ final class CompanionEntity {
     /// Beside the lantern on the side away from the nurse, feet on the lantern's base plane.
     func place(lanternBaseY: Float, lanternHalfWidth: Float, heldArm: HeldArm) {
         side = heldArm == .left ? 1 : -1
-        let halfWidth = (model.visualBounds(relativeTo: nil).extents.x) / 2
+        let halfWidth = (body.model.visualBounds(relativeTo: nil).extents.x) / 2
         root.position = SIMD3(side * (lanternHalfWidth + config.gap + halfWidth), lanternBaseY, 0)
     }
 
@@ -140,6 +168,12 @@ final class CompanionEntity {
 
     func enter(_ cue: CompanionCue, at now: TimeInterval) {
         nextVarietyAt = 0
+        celebrating = false
+        // The row wins: a change of character still fading stops where it is.
+        if switching != nil {
+            switching = nil
+            root.components[OpacityComponent.self]?.opacity = 1
+        }
         switch cue {
         case .waveIn:
             root.isEnabled = true
@@ -158,6 +192,7 @@ final class CompanionEntity {
             idle(now: now)
             scheduleVariety(after: now)
         case .heartCheer:
+            celebrating = true
             play(.heart, then: .cheer, at: now)
         }
     }
@@ -165,6 +200,8 @@ final class CompanionEntity {
     func reset() {
         root.isEnabled = false
         yaw = nil
+        switching = nil
+        wear(0)
         root.components[OpacityComponent.self]?.opacity = 0
         nextVarietyAt = 0
         lastVariety = nil
@@ -175,15 +212,17 @@ final class CompanionEntity {
     /// The breathing loop, cross-faded in.
     private func idle(now: TimeInterval) {
         phase = .idle
-        guard let res = clipResources[.idle] else { return }
-        show(model)
-        let c = model.playAnimation(res, transitionDuration: config.crossfadeS, startsPaused: false)
+        celebrating = false
+        guard let res = body.clipResources[.idle] else { return }
+        show(body.model)
+        let c = body.model.playAnimation(res, transitionDuration: config.crossfadeS, startsPaused: false)
         c.speed = Float(config.speed(for: Clip.idle.rawValue))
         controller = c
     }
 
-    private func play(_ clip: Clip, then next: Next, at now: TimeInterval) {
-        guard let res = clipResources[clip] else { idle(now: now); return }
+    private func play(_ wanted: Clip, then next: Next, at now: TimeInterval) {
+        let clip = wanted.orIdle(in: Set(body.clipResources.keys))
+        guard clip != .idle, let res = body.clipResources[clip] else { idle(now: now); return }
         let entity = entity(for: clip)
         show(entity)
         let c = entity.playAnimation(res, transitionDuration: config.crossfadeS, startsPaused: false)
@@ -191,21 +230,30 @@ final class CompanionEntity {
         controller = c
         phase = .playing(clip, then: next)
         onClipStarted?(clip.rawValue)
-        if mode == .retargeting, entity === model {
-            probe = (clip, now, Self.jointTransforms(of: model))
+        if body.mode == .retargeting, entity === body.model {
+            probe = (clip, now, Self.jointTransforms(of: body.model))
         }
     }
 
     private func entity(for clip: Clip) -> Entity {
-        if mode == .swapping, let own = clipEntities[clip] { return own }
-        return model
+        if body.mode == .swapping, let own = body.clipEntities[clip] { return own }
+        return body.model
     }
 
     private func show(_ entity: Entity) {
-        guard entity !== shown else { return }
-        shown.isEnabled = false
+        guard entity !== body.shown else { return }
+        body.shown.isEnabled = false
         entity.isEnabled = true
-        shown = entity
+        body.shown = entity
+    }
+
+    /// Puts on character `index`, not fading, with no clip running yet.
+    private func wear(_ index: Int) {
+        guard index != current else { return }
+        body.hide()
+        probe = nil
+        current = index
+        body.model.isEnabled = true
     }
 
     private static func jointTransforms(of entity: Entity) -> [Transform] {
@@ -222,6 +270,21 @@ final class CompanionEntity {
     // MARK: Per frame
 
     func update(now: TimeInterval) {
+        if let s = switching {
+            let u = Float(min(1, (now - s.started) / config.switchFadeS))
+            root.components[OpacityComponent.self]?.opacity = s.to == nil ? u : 1 - u
+            if u >= 1 {
+                if let to = s.to {
+                    let charging = nextVarietyAt != 0
+                    wear(to)
+                    idle(now: now)
+                    if charging { scheduleVariety(after: now) }
+                    switching = Switching(to: nil, started: now)
+                } else {
+                    switching = nil
+                }
+            }
+        }
         if case .fadingIn(let started) = phase {
             let u = Float(min(1, (now - started) / config.fadeS))
             root.components[OpacityComponent.self]?.opacity = u
@@ -230,11 +293,11 @@ final class CompanionEntity {
         // Retargeting probe: 0.4 s into a foreign clip the pose must have changed.
         if let p = probe, now - p.started > 0.4 {
             probe = nil
-            if Self.jointTransforms(of: model) == p.before, let own = clipEntities[p.clip] {
-                mode = .swapping
-                status = "loaded, \(clipResources.count) clips, swap fallback (retarget moved no joints)"
+            if Self.jointTransforms(of: body.model) == p.before, let own = body.clipEntities[p.clip] {
+                body.mode = .swapping
+                body.status = "loaded, \(body.clipResources.count) clips, swap fallback (retarget moved no joints)"
                 AssetCatalog.logger.error("companion: clip \(p.clip.rawValue, privacy: .public) did not move the model's skeleton; switching to entity swap")
-                if case .playing(let clip, let next) = phase, clip == p.clip, let res = clipResources[clip] {
+                if case .playing(let clip, let next) = phase, clip == p.clip, let res = body.clipResources[clip] {
                     let elapsed = controller?.time ?? 0
                     show(own)
                     let c = own.playAnimation(res, transitionDuration: 0, startsPaused: false)
@@ -243,8 +306,8 @@ final class CompanionEntity {
                     controller = c
                     phase = .playing(clip, then: next)
                 }
-            } else if mode == .retargeting {
-                status = "loaded, \(clipResources.count) clips, retargeting works"
+            } else if body.mode == .retargeting {
+                body.status = "loaded, \(body.clipResources.count) clips, retargeting works"
             }
         }
         if case .playing(_, let next) = phase, let c = controller, c.isComplete {
@@ -259,7 +322,7 @@ final class CompanionEntity {
         }
         // Charge variety: one clip from the list, never the same twice running.
         if nextVarietyAt > 0, now >= nextVarietyAt, phase == .idle {
-            var pool = config.chargeVariety.compactMap { Clip(rawValue: $0) }.filter { clipResources[$0] != nil }
+            var pool = config.chargeVariety.compactMap { Clip(rawValue: $0) }.filter { body.clipResources[$0] != nil }
             if fidgetsThisSession >= config.fidgetMaxPerSession { pool.removeAll { $0 == .fidget } }
             if pool.count > 1, let last = lastVariety { pool.removeAll { $0 == last } }
             if let pick = pool.randomElement() {
@@ -305,9 +368,10 @@ final class CompanionEntity {
     /// Answers the child's wave or touch with `clipName` if it can: not while it is
     /// still walking in, and not over the celebration (heart, cheer); it
     /// may cut in on idle, a variety clip, listening or looking. Returns
-    /// false when it did not answer, so the wave is not spent.
+    /// false when it did not answer, so the wave is not spent. A clip this
+    /// character lacks is answered with idle.
     func answer(_ clipName: String, at now: TimeInterval) -> Bool {
-        guard let clip = Clip(rawValue: clipName), clipResources[clip] != nil else { return false }
+        guard let clip = Clip(rawValue: clipName), switching == nil else { return false }
         switch phase {
         case .fadingIn: return false
         case .playing(let current, let next):
@@ -316,6 +380,15 @@ final class CompanionEntity {
         }
         play(clip, then: .idle, at: now)
         return true
+    }
+
+    /// Fades to the character `step` places along the list (CompanionSwitch)
+    /// and on into idle: not while it is walking in, over the celebration or
+    /// already changing, and only if there is another character.
+    func switchCharacter(by step: Int, at now: TimeInterval) {
+        guard cast.count > 1, switching == nil, !celebrating else { return }
+        if case .fadingIn = phase { return }
+        switching = Switching(to: CompanionSwitch.index(from: current, by: step, count: cast.count), started: now)
     }
 
     /// Leaving the charge step: no more variety clips.

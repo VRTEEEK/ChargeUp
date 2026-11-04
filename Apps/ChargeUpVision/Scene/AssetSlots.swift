@@ -7,7 +7,8 @@ import os
 
 /// Every designed asset the scene can take, by the file name it is loaded
 /// under. The contract is docs/assets.md. Nothing else in the app names an
-/// asset file.
+/// asset file; the companion's files are named per character in
+/// config.companion.characters.
 enum AssetSlot: String, CaseIterable {
     case lanternHero = "lantern_hero"
     case lanternRound = "lantern_round"
@@ -19,15 +20,6 @@ enum AssetSlot: String, CaseIterable {
     case sleeveTileSoft = "sleeve_tile_soft"
     case chargeMark = "charge_mark"
     case portMarker = "port_marker"
-    case companionModel = "companion_model"
-    case companionClipIdleAlt = "companion_clip_idle_alt"
-    case companionClipWave = "companion_clip_wave"
-    case companionClipListen = "companion_clip_listen"
-    case companionClipLook = "companion_clip_look"
-    case companionClipSway = "companion_clip_sway"
-    case companionClipFidget = "companion_clip_fidget"
-    case companionClipHeart = "companion_clip_heart"
-    case companionClipCheer = "companion_clip_cheer"
     case lanternTree = "lantern_tree"
     /// A lighter copy of the hero lantern for the many that hang on the tree.
     case lanternSmall = "lantern_small"
@@ -37,16 +29,7 @@ enum AssetSlot: String, CaseIterable {
 
     /// port_ring and port_plate are alternatives, not layers: the ring is the
     /// arm's port, the plate is the chest's. The other one is never loaded.
-    var isCompanion: Bool {
-        switch self {
-        case .companionModel, .companionClipIdleAlt, .companionClipWave, .companionClipListen, .companionClipLook,
-             .companionClipSway, .companionClipFidget, .companionClipHeart, .companionClipCheer: return true
-        default: return false
-        }
-    }
-
-    func applies(to site: AccessSite, companionEnabled: Bool, treeEnabled: Bool = true) -> Bool {
-        if isCompanion { return companionEnabled }
+    func applies(to site: AccessSite, treeEnabled: Bool = true) -> Bool {
         if self == .lanternTree { return treeEnabled }
         switch self {
         case .portRing: return site == .arm
@@ -76,6 +59,8 @@ final class AssetCatalog {
     static let glassOpacityParameter = "glassOpacity"
 
     private var models: [AssetSlot: Entity] = [:]
+    /// The companion's models and clips, by file name.
+    private var characterModels: [String: Entity] = [:]
     private var images: [AssetSlot: CGImage] = [:]
     private var textures: [AssetSlot: TextureResource] = [:]
     /// Single-channel alpha of the sprite PNGs, because an opacity map reads
@@ -94,13 +79,14 @@ final class AssetCatalog {
 
     /// Try every slot that applies to the access site once. Missing files are
     /// expected; a file that exists but fails to load is reported by name.
-    func load(accessSite: AccessSite, companionEnabled: Bool = false, treeEnabled: Bool = false) async {
+    func load(accessSite: AccessSite, characterFiles: [String] = [], treeEnabled: Bool = false) async {
         guard !loaded else { return }
         var found: [String] = []
         var broken: [String] = []
         var missing: [AssetSlot] = []
-        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite, companionEnabled: companionEnabled, treeEnabled: treeEnabled) }
-        for slot in AssetSlot.allCases where slot.applies(to: accessSite, companionEnabled: companionEnabled, treeEnabled: treeEnabled) {
+        var missingCharacterFiles: [String] = []
+        skipped = AssetSlot.allCases.filter { !$0.applies(to: accessSite, treeEnabled: treeEnabled) }
+        for slot in AssetSlot.allCases where slot.applies(to: accessSite, treeEnabled: treeEnabled) {
             if slot.isImage {
                 if let image = Self.loadImage(named: slot.rawValue) {
                     images[slot] = image
@@ -137,6 +123,16 @@ final class AssetCatalog {
                 }
             }
         }
+        for file in characterFiles {
+            do {
+                characterModels[file] = try await Entity(named: file, in: chargeUpAssetsBundle)
+                found.append(file)
+            } catch {
+                Self.logger.info("character file \(file, privacy: .public): \(String(describing: error), privacy: .public)")
+                if !Self.looksLikeNotFound(error) { broken.append("\(file): \(error.localizedDescription)") }
+                missingCharacterFiles.append(file)
+            }
+        }
         do {
             glass = try await ShaderGraphMaterial(named: Self.glassMaterialPath, from: Self.glassMaterialFile, in: chargeUpAssetsBundle)
         } catch {
@@ -157,8 +153,9 @@ final class AssetCatalog {
         }
         placeholders = missing
         loaded = true
-        let skippedText = skipped.contains(where: \.isCompanion) ? "companion off, " : ""
-        var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skippedText)\(skipped.filter { !$0.isCompanion }.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
+        let skippedText = characterFiles.isEmpty ? "companion off, " : ""
+        var parts = ["\(found.count) designed, \(missing.count) placeholder, \(skippedText)\(skipped.map(\.rawValue).joined(separator: " ")) not loaded (\(accessSite.rawValue))"]
+        if !missingCharacterFiles.isEmpty { parts.append("character files missing: " + missingCharacterFiles.joined(separator: " ")) }
         parts.append(glass == nil ? "glass shader missing" : "glass shader ok")
         parts.append(siteGlow == nil ? "glow shader missing" : "glow ok")
         parts.append(cableLight == nil ? "cable shader missing" : "cable ok")
@@ -169,15 +166,23 @@ final class AssetCatalog {
     /// A fresh copy of a designed model, with every material named `Glass`
     /// replaced by the LanternGlass shader. Nil means use the placeholder.
     func model(_ slot: AssetSlot) -> Entity? {
-        guard let prototype = models[slot] else { return nil }
+        models[slot].map { copy(of: $0, named: slot.rawValue) }
+    }
+
+    /// A fresh copy of one of the companion's files. Nil if it is absent.
+    func characterModel(_ file: String) -> Entity? {
+        characterModels[file].map { copy(of: $0, named: file) }
+    }
+
+    private func copy(of prototype: Entity, named name: String) -> Entity {
         let copy = prototype.clone(recursive: true)
         let found = Self.materialNames(in: copy)
         var replaced = 0
         if let glass { replaced = Self.applyGlass(glass, to: copy) }
         let bounds = copy.visualBounds(relativeTo: nil)
-        Self.logger.info("model \(slot.rawValue, privacy: .public): materials \(found.joined(separator: ", "), privacy: .public); Glass replaced on \(replaced) model component(s); bounds min \(bounds.min.description, privacy: .public) max \(bounds.max.description, privacy: .public)")
+        Self.logger.info("model \(name, privacy: .public): materials \(found.joined(separator: ", "), privacy: .public); Glass replaced on \(replaced) model component(s); bounds min \(bounds.min.description, privacy: .public) max \(bounds.max.description, privacy: .public)")
         if let glass = Self.glassBounds(in: copy) {
-            Self.logger.info("model \(slot.rawValue, privacy: .public): Glass mesh bounds min \(glass.min.description, privacy: .public) max \(glass.max.description, privacy: .public) centre \(glass.center.description, privacy: .public) (file frame, metres)")
+            Self.logger.info("model \(name, privacy: .public): Glass mesh bounds min \(glass.min.description, privacy: .public) max \(glass.max.description, privacy: .public) centre \(glass.center.description, privacy: .public) (file frame, metres)")
         }
         return copy
     }

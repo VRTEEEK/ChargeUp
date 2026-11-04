@@ -226,12 +226,16 @@ public struct ChargeConfig: Codable, Equatable, Sendable {
 /// The companion character beside the lantern. Off unless enabled.
 public struct CompanionConfig: Codable, Equatable, Sendable {
     public var enabled: Bool
+    /// Who it can be; the first is who it is at the start of every session.
+    public var characters: [CompanionCharacter]
     /// Standing height in metres after scaling.
     public var heightM: Double
     /// Gap between the lantern's side and the character.
     public var gapM: Double
     /// Fade-in length at the waveIn cue.
     public var fadeS: Double
+    /// Changing character: the old one fades out over this, the new one in.
+    public var switchFadeS: Double
     /// Playback speed for every clip unless overridden.
     public var speed: Double
     /// Transition length between any two clips, including into idle.
@@ -248,15 +252,20 @@ public struct CompanionConfig: Codable, Equatable, Sendable {
     /// Waving back at the child, and playing when touched (Wave.swift).
     public var wave: CompanionWaveConfig
     public var touch: CompanionTouchConfig
-    /// Its voice: for a clip named here, one of these sounds (Audio/Sounds,
-    /// without .wav) plays from its head as the clip starts, taking turns.
-    /// Clips not named are silent, so it never chatters while the child
-    /// rests through the infusion, nor on the countdown.
-    public var voices: [String: [String]]
+    /// Its voice is per character (CompanionCharacter.voices): for a clip
+    /// named there, one of those sounds plays from its head as the clip
+    /// starts, taking turns. Clips not named are silent, so it never chatters
+    /// while the child rests through the infusion, nor on the countdown.
     public var voiceGainDb: Double
 
     /// Every voice sound, for loading.
-    public var voiceIds: [String] { Array(Set(voices.values.flatMap { $0 })).sorted() }
+    public var voiceIds: [String] {
+        Array(Set(characters.flatMap { ($0.voices ?? [:]).values.flatMap { $0 } })).sorted()
+    }
+    /// Every model and clip file of every character, for loading.
+    public var characterFiles: [String] {
+        Array(Set(characters.flatMap { [$0.model] + $0.clips.values })).sorted()
+    }
 
     public var height: Float { Float(heightM) }
     public var gap: Float { Float(gapM) }
@@ -627,11 +636,13 @@ public struct SequenceConfig: Codable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .charge, in: c, debugDescription: "charge config values must be > 0")
         }
-        guard companion.heightM > 0, companion.fadeS > 0, companion.speed > 0, companion.crossfadeS >= 0,
+        guard !companion.characters.isEmpty, companion.characters.allSatisfy({ $0.validate() }),
+              Set(companion.characters.map(\.name)).count == companion.characters.count,
+              companion.heightM > 0, companion.fadeS > 0, companion.switchFadeS > 0, companion.speed > 0,
+              companion.crossfadeS >= 0,
               companion.chargeVarietyEverySMin > 0,
               companion.chargeVarietyEverySMax >= companion.chargeVarietyEverySMin,
               !companion.chargeVariety.isEmpty, companion.fidgetMaxPerSession >= 0, companion.wave.validate(),
-              companion.voices.values.allSatisfy({ !$0.isEmpty && $0.allSatisfy { !$0.isEmpty } }),
               companion.touch.validate(),
               companion.speedOverrides.values.allSatisfy({ $0 > 0 }) else {
             throw DecodingError.dataCorruptedError(

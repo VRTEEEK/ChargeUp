@@ -97,6 +97,53 @@ import simd
         #expect(seen == Set(t.responses), "all of them come up")
     }
 
+    @Test func aClipTheCharacterLacksFallsBackToIdle() {
+        let has: Set<CompanionClip> = [.idle, .wave]
+        #expect(CompanionClip.wave.orIdle(in: has) == .wave)
+        #expect(CompanionClip.heart.orIdle(in: has) == .idle)
+    }
+
+    @Test func pinchingTheCompanionPlaysWaveHeartLookInTurn() throws {
+        let touch = try ChargeSequence.shipped().config.companion.touch
+        #expect(touch.pinchClips == ["wave", "heart", "look"])
+        var responder = CompanionResponder()
+        let played = (0..<5).compactMap { responder.respond(at: Double($0), cooldown: 0, responses: touch.pinchClips) }
+        #expect(played == ["wave", "heart", "look", "wave", "heart"])
+    }
+
+    @Test func aDragLeftIsTheNextCharacterAndRightGoesBackPastTheThreshold() throws {
+        let threshold = try ChargeSequence.shipped().config.companion.touch.switchDrag
+        #expect(abs(threshold - 0.08) < 1e-6, "about 8 cm")
+        let start = SIMD3<Float>(0.1, 1, -0.3), head = matrix_identity_float4x4
+        func step(_ dx: Float) -> Int {
+            CompanionSwitch.step(from: start, to: start + SIMD3(dx, 0, 0), head: head, threshold: threshold)
+        }
+        #expect(step(-0.09) == 1)
+        #expect(step(0.09) == -1)
+        #expect(step(-0.07) == 0)
+        #expect(step(0.07) == 0)
+        #expect(step(0) == 0)
+    }
+
+    @Test func onlyTravelAcrossTheHeadChangesTheCharacter() throws {
+        let threshold = try ChargeSequence.shipped().config.companion.touch.switchDrag
+        let head = matrix_identity_float4x4
+        #expect(CompanionSwitch.step(from: .zero, to: SIMD3(0, 0.3, -0.3), head: head, threshold: threshold) == 0)
+        // Facing +x, the head's right is +z: left is -z.
+        let turned = simd_float4x4(simd_quatf(angle: -.pi / 2, axis: SIMD3(0, 1, 0)))
+        #expect(CompanionSwitch.step(from: .zero, to: SIMD3(0, 0, -0.1), head: turned, threshold: threshold) == 1)
+        #expect(CompanionSwitch.step(from: .zero, to: SIMD3(0, 0, 0.1), head: turned, threshold: threshold) == -1)
+        #expect(CompanionSwitch.step(from: .zero, to: SIMD3(-0.1, 0, 0), head: turned, threshold: threshold) == 0)
+    }
+
+    @Test func charactersCycleAndWrapBothWays() {
+        #expect(CompanionSwitch.index(from: 0, by: 1, count: 3) == 1)
+        #expect(CompanionSwitch.index(from: 2, by: 1, count: 3) == 0)
+        #expect(CompanionSwitch.index(from: 0, by: -1, count: 3) == 2)
+        #expect(CompanionSwitch.index(from: 0, by: 1, count: 1) == 0, "one character stays itself")
+        #expect(CompanionSwitch.index(from: 0, by: -1, count: 1) == 0)
+    }
+
     @Test func musicPlaysQuietlyAndDipsForTheNeedle() throws {
         let seq = try ChargeSequence.shipped()
         let m = seq.config.audio.music
