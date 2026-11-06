@@ -3,7 +3,7 @@ import simd
 
 /// Every clip a companion can play, by the name config and cues use.
 public enum CompanionClip: String, CaseIterable, Sendable {
-    case idle, idleAlt, wave, listen, look, sway, fidget, heart, cheer
+    case idle, idleAlt, wave, listen, look, sway, fidget, heart, cheer, hello
 
     /// This clip if the character has it, otherwise idle.
     public func orIdle(in available: Set<CompanionClip>) -> CompanionClip {

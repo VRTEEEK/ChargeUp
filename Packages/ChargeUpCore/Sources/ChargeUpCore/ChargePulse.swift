@@ -23,3 +23,21 @@ public struct ChargePulse: Equatable, Sendable {
         return 1 + visuals.chargePulseDepth * sin(2 * .pi * phase)
     }
 }
+
+/// The charging lantern's hover: it floats on the spot instead of hanging
+/// fixed, drifting up to `hoverMm` vertically and `hoverSwayMm` sideways,
+/// one slow breath every `hoverPeriodS` (config.lantern). The sideways
+/// periods are incommensurate with the vertical one, so the drift wanders
+/// instead of tracing a loop. The scene eases the whole offset in and out
+/// with the charging state, so it never snaps.
+public enum LanternHover {
+    /// The offset in metres at time `t`, zero at t = 0.
+    public static func offset(at t: Double, lantern: LanternConfig) -> SIMD3<Float> {
+        guard lantern.hoverPeriodS > 0 else { return .zero }
+        let rise = Float(lantern.hoverMm / 1000), sway = Float(lantern.hoverSwayMm / 1000)
+        let w = 2 * Double.pi / lantern.hoverPeriodS
+        return SIMD3(sway * Float(sin(w * t / 1.7)),
+                     rise * Float(sin(w * t)),
+                     sway * Float(sin(w * t / 2.3)))
+    }
+}

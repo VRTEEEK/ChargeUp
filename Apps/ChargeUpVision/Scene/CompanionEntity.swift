@@ -277,7 +277,9 @@ final class CompanionEntity {
                 if let to = s.to {
                     let charging = nextVarietyAt != 0
                     wear(to)
-                    idle(now: now)
+                    // The new character greets as it appears; one without a
+                    // hello clip just idles in, as every character did before.
+                    play(.hello, then: .idle, at: now)
                     if charging { scheduleVariety(after: now) }
                     switching = Switching(to: nil, started: now)
                 } else {

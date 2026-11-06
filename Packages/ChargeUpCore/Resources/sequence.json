@@ -34,7 +34,7 @@
       "advance": { "kind": "nurseTap" } },
     { "id": "charge", "companion": "charging",    "name": "Infusion",
       "clinicalCue": "Hours on the pump; free to move, rest or sleep",
-      "perceived": "Golden fireflies flow from the port into the lantern, which fills over time, its light pulsing brighter and dimmer, quicker as it fills",
+      "perceived": "Golden fireflies flow from the port into the lantern, which floats gently on the spot and fills over time, its light pulsing brighter and dimmer, quicker as it fills",
       "childAction": "Come back and look whenever you like",
       "haptic": "none", "audio": "flow_loop",
       "advance": { "kind": "nurseTap", "label": "NEEDLE OUT" } },
@@ -75,7 +75,12 @@
                      "heart": "companion_clip_heart", "cheer": "companion_clip_cheer" },
           "voices": { "wave": ["monkey_wave_1", "monkey_wave_2"], "cheer": ["monkey_cheer"], "heart": ["monkey_heart"] } },
         { "name": "dog", "model": "dog_model",
-          "clips": { "wave": "dog_clip_wave", "listen": "dog_clip_listen", "sway": "dog_clip_sway", "look": "dog_clip_look" } }
+          "clips": { "wave": "dog_clip_wave", "listen": "dog_clip_listen", "sway": "dog_clip_sway",
+                     "look": "dog_clip_look", "hello": "dog_clip_hello" },
+          "voices": { "hello": ["dog_hello"],
+                      "wave": ["dog_whistle", "dog_ring", "dog_zipzap"],
+                      "look": ["dog_blip", "dog_tap", "dog_knock"],
+                      "sway": ["dog_dreamy", "dog_bling"] } }
       ],
       "heightM": 0.22,
       "gapM": 0.06,
@@ -83,7 +88,7 @@
       "switchFadeS": 0.25,
       "speed": 0.7,
       "crossfadeS": 0.3,
-      "speedOverrides": { "wave": 0.8, "sway": 0.6, "cheer": 0.8 },
+      "speedOverrides": { "wave": 0.8, "sway": 0.6, "cheer": 0.8, "hello": 0.8 },
       "chargeVarietyEverySMin": 25,
       "chargeVarietyEverySMax": 40,
       "chargeVariety": ["look", "sway", "idleAlt"],
@@ -199,7 +204,10 @@
       "glowLit": 9.0,
       "lightColorBottom": "#FF6B0A",
       "lightColorTop": "#FFCC26",
-      "glassColor": "#FFDB99"
+      "glassColor": "#FFDB99",
+      "hoverMm": 12,
+      "hoverSwayMm": 7,
+      "hoverPeriodS": 6
     },
     "sky": {
       "seededSessions": 6,

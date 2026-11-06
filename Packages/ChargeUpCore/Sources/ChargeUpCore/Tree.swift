@@ -142,7 +142,7 @@ public struct TreeTouchConfig: Codable, Equatable, Sendable {
     /// the target round each lantern, generous enough to pick out at 2.5 m.
     public var pinch: Bool
     public var pinchTargetMm: Double
-    /// A pinched lantern also chimes: a random one of these small sounds
+    /// A pinched or hand-touched lantern also chimes: a random one of these small sounds
     /// (Audio/Sounds, without .wav), never the same twice running, from the
     /// lantern itself, at `pinchSoundGainDb`. Five soft bell tones on a
     /// pentatonic scale, made for the app, so any two in a row sound sweet.

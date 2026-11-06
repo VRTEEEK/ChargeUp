@@ -89,7 +89,7 @@ public struct WaveDetector: Equatable, Sendable {
     }
 
     /// The head's right, level with the floor.
-    static func right(of head: simd_float4x4) -> SIMD3<Float> {
+    public static func right(of head: simd_float4x4) -> SIMD3<Float> {
         let right = SIMD3<Float>(head.columns.0.x, 0, head.columns.0.z)
         return simd_length(right) > 1e-4 ? simd_normalize(right) : SIMD3(1, 0, 0)
     }

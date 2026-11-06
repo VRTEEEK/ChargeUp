@@ -37,6 +37,9 @@ final class SceneDirector {
     private var pendingRecord: SessionRecord?
     private var lastFrameAt: TimeInterval = 0
     private var headWasOnLantern = false
+    /// How much of the charging hover is on, 0...1, eased so the lantern
+    /// lifts into its float and settles back without a snap.
+    private var hoverAmount: Float = 0
     /// One wave detector per hand (0 left, 1 right) and the answer chooser.
     private var waveDetectors: [Int: WaveDetector] = [:]
     private var waveResponder = CompanionResponder()
@@ -162,13 +165,20 @@ final class SceneDirector {
         stepChanged(now: now)
         let state = controller.state
         updateGlance(dt: dt)
+        updateHover(now: now, dt: dt)
         updateRise(now: now)
         tree?.update(now: now)
         let lanternsReachable = sky.isTree && TreeTouch.isActive(stepId: controller.currentStepId,
                                                                   steps: controller.sequence.steps.map(\.id),
                                                                   touch: controller.sequence.config.tree.touch)
         if lanternsReachable {
-            sky.touch(points: controller.portSource.touchPoints(now: now), now: now)
+            // A touched lantern chimes like a pinched one: the sound confirms
+            // the touch, from the lantern itself, never the same tone twice.
+            if let centre = sky.touch(points: controller.portSource.touchPoints(now: now), now: now).first,
+               let chime = controller.sequence.config.tree.touch.randomPinchSound(after: lastChime, using: &playRandom) {
+                lastChime = chime
+                sounds.playChime(chime, at: centre)
+            }
         }
         sky.setPinchable(lanternsReachable && controller.sequence.config.tree.touch.pinch)
         updateLookSparkle(now: now)
@@ -206,6 +216,19 @@ final class SceneDirector {
     /// On landing the sky adopts the flying lantern itself (no copy, no
     /// swap), the tree flares, and a fresh dark lantern waits, hidden, for
     /// the next session.
+    /// While the lantern charges it floats on the spot (config.lantern.hover*),
+    /// easing in and out over about half a second with the state. Never while
+    /// it flies to the sky: the rise owns the body from lift-off, and the
+    /// hover has settled long before release.
+    private func updateHover(now: TimeInterval, dt: Float) {
+        let charging = if case .charging = lantern.state { true } else { false }
+        let target: Float = charging && riseStartedAt == nil ? 1 : 0
+        hoverAmount += (target - hoverAmount) * min(1, dt * 4)
+        if target == 0, hoverAmount < 0.001 { hoverAmount = 0 }
+        guard riseStartedAt == nil else { return }
+        lantern.body.position = hoverAmount * LanternHover.offset(at: now, lantern: controller.sequence.config.lantern)
+    }
+
     private func updateRise(now: TimeInterval) {
         guard let riseStartedAt else { return }
         let u = Float(min(1, (now - riseStartedAt) / controller.sequence.config.sky.rise))
@@ -412,8 +435,10 @@ final class SceneDirector {
         guard let companion, companion.contains(entity) else { return }
         let touch = controller.sequence.config.companion.touch
         guard companion.isPresent, touch.pinch, touch.isActive(stepId: controller.currentStepId) else { return }
-        let step = CompanionSwitch.step(from: start, to: end, head: controller.headPose.current() ?? matrix_identity_float4x4,
-                                        threshold: touch.switchDrag)
+        let head = controller.headPose.current() ?? matrix_identity_float4x4
+        let step = CompanionSwitch.step(from: start, to: end, head: head, threshold: touch.switchDrag)
+        let across = simd_dot(end - start, WaveDetector.right(of: head))
+        AssetCatalog.logger.info("companion drag: \(Int(across * 1000)) mm across, step \(step), \(self.companion?.status ?? "", privacy: .public)")
         if step != 0 { companion.switchCharacter(by: step, at: CACurrentMediaTime()) }
     }
 

@@ -245,9 +245,12 @@ final class LanternSky {
 
     /// Per frame while touch is active (config.tree.touch): a hand point
     /// reaching a lantern pushes it away from the hand. `points` are world
-    /// positions; the caller decides when touch is active.
-    func touch(points: [SIMD3<Float>], now: TimeInterval) {
-        guard let tree, !points.isEmpty else { return }
+    /// positions; the caller decides when touch is active. Returns the world
+    /// centre of each lantern newly pushed this frame (its chime plays there).
+    @discardableResult
+    func touch(points: [SIMD3<Float>], now: TimeInterval) -> [SIMD3<Float>] {
+        guard let tree, !points.isEmpty else { return [] }
+        var pushed: [SIMD3<Float>] = []
         for i in entries.indices {
             let centre = entries[i].lantern.body.position(relativeTo: nil)
             guard let nearest = points.min(by: { simd_distance($0, centre) < simd_distance($1, centre) }) else { continue }
@@ -257,7 +260,9 @@ final class LanternSky {
             guard let axis = TreeTouch.swingAxis(push: push) else { continue }
             touches[i].axis = axis
             touches[i].startedAt = now
+            pushed.append(centre)
         }
+        return pushed
     }
 
     /// Per frame on the tree: swing every lantern about its hook, plus any

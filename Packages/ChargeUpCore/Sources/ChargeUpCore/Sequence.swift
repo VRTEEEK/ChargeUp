@@ -527,6 +527,11 @@ public struct LanternConfig: Codable, Equatable, Sendable {
     public var lightColorBottom: String
     public var lightColorTop: String
     public var glassColor: String
+    /// While charging the lantern floats on the spot (LanternHover): up to
+    /// hoverMm vertically and hoverSwayMm sideways, a breath every hoverPeriodS.
+    public var hoverMm: Double
+    public var hoverSwayMm: Double
+    public var hoverPeriodS: Double
 
     public var lightBottomRGB: SIMD3<Float> { hexRGB(lightColorBottom) ?? SIMD3(1, 0.42, 0.04) }
     public var lightTopRGB: SIMD3<Float> { hexRGB(lightColorTop) ?? SIMD3(1, 0.8, 0.15) }

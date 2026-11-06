@@ -1,5 +1,6 @@
 import Foundation
 import Testing
+import simd
 @testable import ChargeUpCore
 
 @Suite struct SequenceTests {
@@ -142,14 +143,15 @@ import Testing
         #expect(c.characterFiles.contains("companion_model"))
     }
 
-    @Test func theDogIsTheSecondCharacterSilentWithItsOwnClips() throws {
+    @Test func theDogIsTheSecondCharacterWithItsOwnClipsAndVoices() throws {
         let c = try ChargeSequence.shipped().config.companion
         let dog = try #require(c.characters.dropFirst().first)
         #expect(dog.name == "dog")
         #expect(dog.model == "dog_model")
         #expect(dog.clipFiles == [.wave: "dog_clip_wave", .listen: "dog_clip_listen",
-                                  .sway: "dog_clip_sway", .look: "dog_clip_look"])
-        #expect(dog.voices == nil, "silent, never the monkey's voice")
+                                  .sway: "dog_clip_sway", .look: "dog_clip_look", .hello: "dog_clip_hello"])
+        #expect(dog.voices?["hello"] == ["dog_hello"], "it says hello as it appears")
+        #expect(dog.voices?["listen"] == nil, "quiet on the needle steps")
     }
 
     @Test func everyCharacterFileIsInTheAssetsPackage() throws {
@@ -231,6 +233,28 @@ import Testing
         config["lantern"] = lantern
         json["config"] = config
         #expect(throws: DecodingError.self) { try load(json) }
+    }
+
+    @Test func chargingLanternHoversGentlyOnTheSpot() throws {
+        let seq = try ChargeSequence.shipped()
+        let lantern = seq.config.lantern
+        #expect(seq.step(id: StepID.charge)?.perceived.contains("floats") == true, "the row names the float")
+        #expect(lantern.hoverMm > 0 && lantern.hoverPeriodS > 0)
+        #expect(LanternHover.offset(at: 0, lantern: lantern) == .zero, "starts from its resting place")
+        let rise = Float(lantern.hoverMm / 1000), sway = Float(lantern.hoverSwayMm / 1000)
+        var peak = SIMD3<Float>.zero, previous = SIMD3<Float>.zero
+        for i in 0..<(90 * 60) {
+            let t = Double(i) / 90
+            let o = LanternHover.offset(at: t, lantern: lantern)
+            peak = simd_max(peak, simd_abs(o))
+            #expect(simd_length(o - previous) < 0.002, "drifts, never jumps")
+            previous = o
+        }
+        #expect(peak.y <= rise && peak.x <= sway && peak.z <= sway, "never beyond its little float")
+        #expect(peak.y > rise * 0.9 && peak.x > sway * 0.5, "and it does move")
+        var broken = lantern
+        broken.hoverPeriodS = 0
+        #expect(LanternHover.offset(at: 1, lantern: broken) == .zero, "a zero period holds still")
     }
 
     @Test func chargingLanternPulsesQuickerAsItFills() throws {
