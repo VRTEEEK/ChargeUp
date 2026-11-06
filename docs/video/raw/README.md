@@ -1,3 +1,5 @@
+> The two headset `.mov` files are too large for GitHub's 100 MB limit, so they are not in this repository. Download them from the [raw-recordings release](https://github.com/VRTEEEK/ChargeUp/releases/tag/raw-recordings). Commit hashes below predate the history rewrite that removed them.
+
 # Raw recordings, 20 Oct 2026
 
 Two uncut simulator captures of one rehearsal-mode session, recorded at the same time with `xcrun simctl io <device> recordVideo --codec h264`. Nothing was trimmed, scaled or re-encoded.

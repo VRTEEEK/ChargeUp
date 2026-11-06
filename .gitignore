@@ -25,3 +25,7 @@ Fallback/ChargeUpQuest/[Oo]bj/
 Fallback/ChargeUpQuest/[Bb]uild/
 Fallback/ChargeUpQuest/[Ll]ogs/
 Fallback/ChargeUpQuest/[Uu]ser[Ss]ettings/
+
+# Over GitHub's 100 MB file limit; kept as assets on the raw-recordings release
+docs/video/raw/headset-rehearsal-child-view.mov
+docs/video/raw/headset-rehearsal-companion-child-view.mov
